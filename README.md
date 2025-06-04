@@ -19,9 +19,8 @@ npm install
 npm run build
 ```
 
-Copy the contents of the generated `build` directory into
-`react-db-plugin/assets`. The plugin expects `app.js` and `app.css` to be
-located there.
+After building, the script defined in `package.json` copies the generated
+files into `react-db-plugin/assets` as `app.js` and `app.css`.
 
 3. Move the `react-db-plugin` directory to your WordPress
 `wp-content/plugins` directory and activate **React DB Plugin** from the
