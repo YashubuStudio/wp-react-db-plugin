@@ -16,7 +16,15 @@ const Logs = () => {
     if (isPlugin) {
       fetch('/wp-json/reactdb/v1/logs')
         .then((r) => r.json())
-        .then((data) => setLogs(data))
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setLogs(data);
+          } else {
+            setLogs([
+              { created_at: '-', user_id: '-', action: '-', description: '取得失敗' }
+            ]);
+          }
+        })
         .catch(() => {
           setLogs([
             { created_at: '-', user_id: '-', action: '-', description: '取得失敗' }
@@ -45,14 +53,22 @@ const Logs = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {logs.map((log, i) => (
-              <TableRow key={i}>
-                <TableCell>{log.created_at}</TableCell>
-                <TableCell>{log.user_id}</TableCell>
-                <TableCell>{log.action}</TableCell>
-                <TableCell>{log.description}</TableCell>
+            {logs.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} align="center">
+                  ログがありません
+                </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              logs.map((log, i) => (
+                <TableRow key={i}>
+                  <TableCell>{log.created_at}</TableCell>
+                  <TableCell>{log.user_id}</TableCell>
+                  <TableCell>{log.action}</TableCell>
+                  <TableCell>{log.description}</TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </Paper>
