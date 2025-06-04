@@ -19,9 +19,16 @@ add_action('admin_menu', function() {
             // so mirror that here when rendering inside the admin page
             echo '<div id="root"></div>';
             wp_enqueue_script(
+                'react-db-plugin-runtime',
+                plugins_url('assets/runtime.js', __FILE__),
+                [],
+                '1.0',
+                true
+            );
+            wp_enqueue_script(
                 'react-db-plugin-script',
                 plugins_url('assets/app.js', __FILE__),
-                [],
+                ['react-db-plugin-runtime'],
                 '1.0',
                 true
             );
