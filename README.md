@@ -30,6 +30,16 @@ WordPress admin panel.
 Once activated, a new "React DB" menu will appear and open the React
 interface.
 
+## Shortcode and Block
+
+Use the `[reactdb]` shortcode or **React DB Block** to display a row from a
+database table. Both accept an `input` attribute formatted as
+`DB:"table",data` to specify the table and optional extra data. Example:
+
+```wordpress
+[reactdb input='DB:"c1",sample']
+```
+
 ## Development Notes
 
 - React source files live under `src/`.
