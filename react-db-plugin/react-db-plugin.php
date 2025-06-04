@@ -15,17 +15,19 @@ add_action('admin_menu', function() {
         'manage_options',
         'react-db-plugin',
         function() {
-            echo '<div id="react-db-root"></div>';
+            // The React app expects a container with id "root"
+            // so mirror that here when rendering inside the admin page
+            echo '<div id="root"></div>';
             wp_enqueue_script(
                 'react-db-plugin-script',
-                plugins_url('/assets/app.js', __FILE__),
+                plugins_url('assets/app.js', __FILE__),
                 [],
                 '1.0',
                 true
             );
             wp_enqueue_style(
                 'react-db-plugin-style',
-                plugins_url('/assets/app.css', __FILE__),
+                plugins_url('assets/app.css', __FILE__),
                 [],
                 '1.0'
             );
@@ -59,4 +61,16 @@ register_activation_hook(__FILE__, function() {
 
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
     dbDelta($sql);
+
+    // Create front-end page for the React app if it doesn't exist
+    if (!get_page_by_path('react-db-app')) {
+        wp_insert_post([
+            'post_title'   => 'React DB App',
+            'post_name'    => 'react-db-app',
+            'post_status'  => 'publish',
+            'post_type'    => 'page',
+            'post_content' => '[reactdb_app]'
+        ]);
+        flush_rewrite_rules();
+    }
 });

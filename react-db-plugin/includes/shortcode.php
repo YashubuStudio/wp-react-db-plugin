@@ -30,3 +30,33 @@ function reactdb_shortcode($atts) {
     return '<div class="reactdb-block">' . $content . '</div>';
 }
 add_shortcode('reactdb', 'reactdb_shortcode');
+
+function reactdb_app_shortcode() {
+    if (!is_user_logged_in()) {
+        return '<p>Please log in to view this page.</p>';
+    }
+
+    // Render container for the React app on the front-end
+    ob_start();
+    echo '<div id="root"></div>';
+
+    wp_enqueue_script(
+        'react-db-plugin-script',
+        plugins_url('assets/app.js', dirname(__DIR__) . '/react-db-plugin.php'),
+        [],
+        '1.0',
+        true
+    );
+    wp_enqueue_style(
+        'react-db-plugin-style',
+        plugins_url('assets/app.css', dirname(__DIR__) . '/react-db-plugin.php'),
+        [],
+        '1.0'
+    );
+    wp_localize_script('react-db-plugin-script', 'ReactDbGlobals', [
+        'isPlugin' => false
+    ]);
+
+    return ob_get_clean();
+}
+add_shortcode('reactdb_app', 'reactdb_app_shortcode');
