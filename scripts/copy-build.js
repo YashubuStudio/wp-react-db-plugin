@@ -22,6 +22,7 @@ function copyFile(srcPattern, destName) {
 
 try {
   copyFile({dir: path.join(buildDir, 'static', 'js'), regex: /^main.*\.js$/}, 'app.js');
+  copyFile({dir: path.join(buildDir, 'static', 'js'), regex: /^runtime.*\.js$/}, 'runtime.js');
   copyFile({dir: path.join(buildDir, 'static', 'css'), regex: /^main.*\.css$/}, 'app.css');
 } catch (err) {
   console.error(err.message);
