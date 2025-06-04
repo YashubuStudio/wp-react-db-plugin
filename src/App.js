@@ -1,5 +1,5 @@
 import React from 'react';
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import CSVImport from './pages/CSVImport';
 import CSVExport from './pages/CSVExport';
@@ -11,7 +11,7 @@ function App() {
     <Router>
       <Layout>
         <Routes>
-          <Route path="/" element={<Navigate to="/db" />} />
+          <Route path="/" element={<DatabaseManager />} />
           <Route path="/import" element={<CSVImport />} />
           <Route path="/export" element={<CSVExport />} />
           <Route path="/db" element={<DatabaseManager />} />
