@@ -41,6 +41,7 @@ require_once __DIR__ . '/includes/api.php';
 require_once __DIR__ . '/includes/csv-handler.php';
 require_once __DIR__ . '/includes/log-handler.php';
 require_once __DIR__ . '/includes/shortcode.php';
+require_once __DIR__ . '/includes/block.php';
 
 register_activation_hook(__FILE__, function() {
     global $wpdb;
