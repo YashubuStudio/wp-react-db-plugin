@@ -15,8 +15,6 @@ add_action('admin_menu', function() {
         'manage_options',
         'react-db-plugin',
         function() {
-            // The React app expects a container with id "root"
-            // so mirror that here when rendering inside the admin page
             echo '<div id="root"></div>';
             wp_enqueue_script(
                 'react-db-plugin-script',
@@ -24,11 +22,6 @@ add_action('admin_menu', function() {
                 [],
                 '1.0',
                 true
-            );
-            wp_add_inline_script(
-                'react-db-plugin-script',
-                "if (location.hash === '#/db') { location.hash = '#/'; }",
-                'after'
             );
             wp_enqueue_style(
                 'react-db-plugin-style',
@@ -45,6 +38,7 @@ add_action('admin_menu', function() {
         }
     );
 });
+
 
 // REST APIを含める
 require_once __DIR__ . '/includes/api.php';
