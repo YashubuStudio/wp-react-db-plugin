@@ -25,11 +25,6 @@ add_action('admin_menu', function() {
                 '1.0',
                 true
             );
-            wp_add_inline_script(
-                'react-db-plugin-script',
-                "if (location.hash === '#/db') { location.hash = '#/'; }",
-                'after'
-            );
             wp_enqueue_style(
                 'react-db-plugin-style',
                 plugins_url('assets/app.css', __FILE__),
