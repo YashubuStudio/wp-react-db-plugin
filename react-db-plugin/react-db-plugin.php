@@ -16,8 +16,22 @@ add_action('admin_menu', function() {
         'react-db-plugin',
         function() {
             echo '<div id="react-db-root"></div>';
-            wp_enqueue_script('react-db-plugin-script', plugins_url('/assets/app.js', __FILE__), [], '1.0', true);
-            wp_enqueue_style('react-db-plugin-style', plugins_url('/assets/app.css', __FILE__), [], '1.0');
+            wp_enqueue_script(
+                'react-db-plugin-script',
+                plugins_url('/assets/app.js', __FILE__),
+                [],
+                '1.0',
+                true
+            );
+            wp_enqueue_style(
+                'react-db-plugin-style',
+                plugins_url('/assets/app.css', __FILE__),
+                [],
+                '1.0'
+            );
+            wp_localize_script('react-db-plugin-script', 'ReactDbGlobals', [
+                'isPlugin' => true
+            ]);
         }
     );
 });
@@ -26,6 +40,7 @@ add_action('admin_menu', function() {
 require_once __DIR__ . '/includes/api.php';
 require_once __DIR__ . '/includes/csv-handler.php';
 require_once __DIR__ . '/includes/log-handler.php';
+require_once __DIR__ . '/includes/shortcode.php';
 
 register_activation_hook(__FILE__, function() {
     global $wpdb;
