@@ -1,4 +1,10 @@
 import React, { useState } from 'react';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import MenuItem from '@mui/material/MenuItem';
+import Link from '@mui/material/Link';
 
 const CSVExport = () => {
   const [downloadUrl, setDownloadUrl] = useState('');
@@ -9,22 +15,24 @@ const CSVExport = () => {
   };
 
   return (
-    <div>
-      <h2 className="text-lg font-bold mb-4">CSVエクスポート</h2>
-      <select className="border p-2 mb-4">
-        <option>テーブルを選択</option>
-      </select>
-      <button onClick={handleExport} className="bg-blue-500 text-white px-4 py-2 rounded">
+    <Box>
+      <Typography variant="h5" gutterBottom>
+        CSVエクスポート
+      </Typography>
+      <TextField select label="テーブルを選択" fullWidth sx={{ mb: 2 }}>
+        <MenuItem value="">テーブルを選択</MenuItem>
+      </TextField>
+      <Button variant="contained" onClick={handleExport}>
         エクスポート
-      </button>
+      </Button>
       {downloadUrl && (
-        <div className="mt-4">
-          <a href={downloadUrl} download className="text-blue-600 underline">
+        <Box sx={{ mt: 2 }}>
+          <Link href={downloadUrl} download>
             ダウンロード
-          </a>
-        </div>
+          </Link>
+        </Box>
       )}
-    </div>
+    </Box>
   );
 };
 
