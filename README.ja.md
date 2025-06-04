@@ -1,0 +1,45 @@
+# WordPress向けReact DBプラグイン
+
+このリポジトリは、Reactアプリケーションを管理画面に組み込むシンプルなWordPressプラグインを提供します。Reactアプリは独自のREST APIエンドポイントを通じてCSVファイルの読み書きや、操作ログテーブルへの記録を行います。
+
+## はじめに
+
+1. JavaScript依存パッケージをインストールします。
+
+```bash
+npm install
+```
+
+2. Reactアプリケーションをビルドします。
+
+```bash
+npm run build
+```
+
+ビルド後、`package.json`で定義されているスクリプトにより、生成物は`react-db-plugin/assets`に`app.js`と`app.css`としてコピーされます。
+
+3. `react-db-plugin`ディレクトリをWordPressの`wp-content/plugins`に移動し、管理画面で**React DB Plugin**を有効化します。
+
+有効化すると「React DB」というメニューが追加され、Reactで作成された管理インターフェースが表示されます。
+
+## ショートコードとブロック
+
+データベーステーブルの1行を表示するには、`[reactdb]`ショートコードまたは**React DB Block**を使用します。どちらも`DB:"テーブル",追加データ`という形式の`input`属性を受け取ります。例:
+
+```wordpress
+[reactdb input='DB:"c1",sample']
+```
+
+## 開発メモ
+
+- Reactのソースコードは`src/`に配置されています。
+- PHPプラグインファイルは`react-db-plugin/`にあります。
+- 画面レイアウト案は`設計.txt`に記載されています。
+
+## テスト
+
+環境に必要な依存関係がインストールされている場合、次のコマンドでテストを実行できます。
+
+```bash
+npm test
+```
