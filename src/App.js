@@ -1,20 +1,24 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import React from 'react';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Layout from './components/Layout';
+import CSVImport from './pages/CSVImport';
+import CSVExport from './pages/CSVExport';
+import DatabaseManager from './pages/DatabaseManager';
+import Logs from './pages/Logs';
 
 function App() {
-  const [csvData, setCsvData] = useState([]);
-
-  useEffect(() => {
-    axios.get('/wp-json/reactdb/v1/csv/read')
-      .then(res => setCsvData(res.data))
-      .catch(err => console.error(err));
-  }, []);
-
   return (
-    <div>
-      <h1>CSV Data</h1>
-      <pre>{JSON.stringify(csvData, null, 2)}</pre>
-    </div>
+    <Router>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Navigate to="/import" />} />
+          <Route path="/import" element={<CSVImport />} />
+          <Route path="/export" element={<CSVExport />} />
+          <Route path="/db" element={<DatabaseManager />} />
+          <Route path="/logs" element={<Logs />} />
+        </Routes>
+      </Layout>
+    </Router>
   );
 }
 
