@@ -5,12 +5,14 @@ import Header from './Header';
 import Sidebar from './Sidebar';
 
 const Layout = ({ children }) => (
-  <Box sx={{ display: 'flex' }}>
+  <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
     <Header />
-    <Sidebar />
-    <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
-      <Toolbar />
-      {children}
+    <Box sx={{ display: 'flex', flexGrow: 1 }}>
+      <Sidebar />
+      <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
+        <Toolbar />
+        {children}
+      </Box>
     </Box>
   </Box>
 );

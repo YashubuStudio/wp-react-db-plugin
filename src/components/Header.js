@@ -5,7 +5,7 @@ import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 
 const Header = () => (
-  <AppBar position="static">
+  <AppBar position="fixed" color="default" sx={{ backgroundColor: '#fff' }}>
     <Toolbar>
       <Typography variant="h6" sx={{ flexGrow: 1 }}>
         React DB Manager

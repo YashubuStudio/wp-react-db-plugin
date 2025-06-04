@@ -11,7 +11,7 @@ function App() {
     <Router>
       <Layout>
         <Routes>
-          <Route path="/" element={<Navigate to="/import" />} />
+          <Route path="/" element={<Navigate to="/db" />} />
           <Route path="/import" element={<CSVImport />} />
           <Route path="/export" element={<CSVExport />} />
           <Route path="/db" element={<DatabaseManager />} />
