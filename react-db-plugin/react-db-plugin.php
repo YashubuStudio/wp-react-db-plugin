@@ -31,8 +31,11 @@ add_action('admin_menu', function() {
                 [],
                 '1.0'
             );
+            $user = wp_get_current_user();
             wp_localize_script('react-db-plugin-script', 'ReactDbGlobals', [
-                'isPlugin' => true
+                'isPlugin'    => true,
+                'currentUser' => $user->display_name,
+                'logoutUrl'   => wp_logout_url()
             ]);
         }
     );
@@ -73,4 +76,15 @@ register_activation_hook(__FILE__, function() {
         ]);
         flush_rewrite_rules();
     }
+});
+
+// Use blank template for the React DB page
+add_filter('template_include', function ($template) {
+    if (is_page('react-db-app')) {
+        $custom = plugin_dir_path(__FILE__) . 'templates/blank.php';
+        if (file_exists($custom)) {
+            return $custom;
+        }
+    }
+    return $template;
 });

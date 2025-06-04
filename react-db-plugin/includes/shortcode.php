@@ -53,8 +53,11 @@ function reactdb_app_shortcode() {
         [],
         '1.0'
     );
+    $user = wp_get_current_user();
     wp_localize_script('react-db-plugin-script', 'ReactDbGlobals', [
-        'isPlugin' => false
+        'isPlugin'    => true,
+        'currentUser' => $user->display_name,
+        'logoutUrl'   => wp_logout_url()
     ]);
 
     return ob_get_clean();
