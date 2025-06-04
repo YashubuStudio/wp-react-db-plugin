@@ -25,7 +25,9 @@ const Sidebar = () => (
       [`& .MuiDrawer-paper`]: {
         width: drawerWidth,
         boxSizing: 'border-box',
-        backgroundColor: '#fff'
+        backgroundColor: '#fff',
+        top: 64,
+        height: 'calc(100% - 64px)'
       }
     }}
   >
