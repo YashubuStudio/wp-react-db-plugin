@@ -61,7 +61,17 @@ function reactdb_app_shortcode() {
     ]);
     wp_add_inline_script(
         'react-db-plugin-script',
-        "function reactdb_fix(){var h=location.hash.replace(/^#/, '');if(/^\\/?db(\\/|$)/.test(h)){location.hash='#/';}}window.addEventListener('hashchange',reactdb_fix);document.addEventListener('DOMContentLoaded',reactdb_fix);",
+        "function reactdb_fix(){\n" +
+        "  var h=location.hash.replace(/^#/, '');\n" +
+        "  if(/^\\/?db(\\/|$)/.test(h)){location.hash='#/';return;}\n" +
+        "  if(/\\/db(\\/)?$/.test(location.pathname)){\n" +
+        "    var base=location.pathname.replace(/\\/db(\\/)?$/, '/');\n" +
+        "    location.replace(base + location.search + '#/');\n" +
+        "  }\n" +
+        "}\n" +
+        "window.addEventListener('hashchange',reactdb_fix);\n" +
+        "document.addEventListener('DOMContentLoaded',reactdb_fix);",
+
         'after'
     );
 
