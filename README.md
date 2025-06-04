@@ -26,8 +26,14 @@ files into `react-db-plugin/assets` as `app.js` and `app.css`.
 `wp-content/plugins` directory and activate **React DB Plugin** from the
 WordPress admin panel.
 
-Once activated, a new "React DB" menu will appear and open the React
-interface.
+Once activated, a new "React DB" menu will appear in the WordPress
+dashboard. In addition, activation automatically creates a public page at
+`/react-db-app/` containing the React interface so you can access the
+tool without visiting the admin area.
+
+If the page wasn't created for some reason, simply create a new page and
+insert the `[reactdb_app]` shortcode to embed the interface on the front
+end.
 
 ## Shortcode and Block
 

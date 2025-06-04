@@ -20,7 +20,9 @@ npm run build
 
 3. `react-db-plugin`ディレクトリをWordPressの`wp-content/plugins`に移動し、管理画面で**React DB Plugin**を有効化します。
 
-有効化すると「React DB」というメニューが追加され、Reactで作成された管理インターフェースが表示されます。
+有効化すると「React DB」というメニューが追加されるほか、フロントエンド用のページ`/react-db-app/`が自動生成されます。管理画面を開かずにこのURLからReactアプリにアクセスできます。
+
+もしページが作成されていない場合は、新規ページを作成して`[reactdb_app]`ショートコードを挿入してください。
 
 ## ショートコードとブロック
 
