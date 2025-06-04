@@ -47,11 +47,6 @@ function reactdb_app_shortcode() {
         '1.0',
         true
     );
-    wp_add_inline_script(
-        'react-db-plugin-script',
-        "if (location.hash === '#/db') { location.hash = '#/'; }",
-        'after'
-    );
     wp_enqueue_style(
         'react-db-plugin-style',
         plugins_url('assets/app.css', dirname(__DIR__) . '/react-db-plugin.php'),
@@ -64,6 +59,11 @@ function reactdb_app_shortcode() {
         'currentUser' => $user->display_name,
         'logoutUrl'   => wp_logout_url()
     ]);
+    wp_add_inline_script(
+        'react-db-plugin-script',
+        "function reactdb_fix(){if(location.hash==='#/db'){location.hash='#/';}}window.addEventListener('hashchange',reactdb_fix);reactdb_fix();",
+        'after'
+    );
 
     return ob_get_clean();
 }
