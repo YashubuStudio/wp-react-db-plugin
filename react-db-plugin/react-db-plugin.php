@@ -18,14 +18,14 @@ add_action('admin_menu', function() {
             echo '<div id="react-db-root"></div>';
             wp_enqueue_script(
                 'react-db-plugin-script',
-                plugins_url('/assets/app.js', __FILE__),
+                plugins_url('assets/app.js', __FILE__),
                 [],
                 '1.0',
                 true
             );
             wp_enqueue_style(
                 'react-db-plugin-style',
-                plugins_url('/assets/app.css', __FILE__),
+                plugins_url('assets/app.css', __FILE__),
                 [],
                 '1.0'
             );
