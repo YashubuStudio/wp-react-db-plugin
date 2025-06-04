@@ -1,17 +1,44 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+import Drawer from '@mui/material/Drawer';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemText from '@mui/material/ListItemText';
+import Toolbar from '@mui/material/Toolbar';
 
-const linkClass = 'block py-2 px-4 hover:bg-gray-200';
+const navItems = [
+  { text: 'CSVインポート', to: '/import' },
+  { text: 'CSVエクスポート', to: '/export' },
+  { text: 'データベース一覧', to: '/db' },
+  { text: '操作ログ', to: '/logs' }
+];
+
+const drawerWidth = 240;
 
 const Sidebar = () => (
-  <aside className="bg-gray-100 w-48 min-h-screen">
-    <nav>
-      <NavLink className={linkClass} to="/import">CSVインポート</NavLink>
-      <NavLink className={linkClass} to="/export">CSVエクスポート</NavLink>
-      <NavLink className={linkClass} to="/db">データベース一覧</NavLink>
-      <NavLink className={linkClass} to="/logs">操作ログ</NavLink>
-    </nav>
-  </aside>
+  <Drawer
+    variant="permanent"
+    sx={{
+      width: drawerWidth,
+      flexShrink: 0,
+      [`& .MuiDrawer-paper`]: {
+        width: drawerWidth,
+        boxSizing: 'border-box'
+      }
+    }}
+  >
+    <Toolbar />
+    <List>
+      {navItems.map((item) => (
+        <ListItem key={item.to} disablePadding>
+          <ListItemButton component={NavLink} to={item.to}>
+            <ListItemText primary={item.text} />
+          </ListItemButton>
+        </ListItem>
+      ))}
+    </List>
+  </Drawer>
 );
 
 export default Sidebar;

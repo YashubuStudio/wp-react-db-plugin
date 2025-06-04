@@ -1,4 +1,8 @@
 import React, { useState } from 'react';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import Paper from '@mui/material/Paper';
 
 const CSVImport = () => {
   const [log, setLog] = useState('');
@@ -9,16 +13,22 @@ const CSVImport = () => {
   };
 
   return (
-    <div>
-      <h2 className="text-lg font-bold mb-4">CSVインポート</h2>
-      <div className="border-dashed border-2 p-8 text-center mb-4">
+    <Box>
+      <Typography variant="h5" gutterBottom>
+        CSVインポート
+      </Typography>
+      <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', mb: 2 }}>
         <input type="file" accept=".csv" />
-      </div>
-      <button onClick={handleUpload} className="bg-blue-500 text-white px-4 py-2 rounded">
+      </Paper>
+      <Button variant="contained" onClick={handleUpload}>
         アップロード
-      </button>
-      {log && <div className="mt-4">{log}</div>}
-    </div>
+      </Button>
+      {log && (
+        <Typography sx={{ mt: 2 }}>
+          {log}
+        </Typography>
+      )}
+    </Box>
   );
 };
 

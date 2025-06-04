@@ -1,15 +1,18 @@
 import React from 'react';
+import Box from '@mui/material/Box';
+import Toolbar from '@mui/material/Toolbar';
 import Header from './Header';
 import Sidebar from './Sidebar';
 
 const Layout = ({ children }) => (
-  <div className="min-h-screen flex flex-col">
+  <Box sx={{ display: 'flex' }}>
     <Header />
-    <div className="flex flex-1">
-      <Sidebar />
-      <main className="flex-1 p-4">{children}</main>
-    </div>
-  </div>
+    <Sidebar />
+    <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
+      <Toolbar />
+      {children}
+    </Box>
+  </Box>
 );
 
 export default Layout;
