@@ -71,6 +71,7 @@ function reactdb_app_shortcode() {
         "}\n" +
         "window.addEventListener('hashchange',reactdb_fix);\n" +
         "document.addEventListener('DOMContentLoaded',reactdb_fix);",
+
         'after'
     );
 
