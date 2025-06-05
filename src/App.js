@@ -13,6 +13,7 @@ function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<DatabaseManager />} />
+          <Route path="/db" element={<DatabaseManager />} />
           <Route path="/import" element={<CSVImport />} />
           <Route path="/export" element={<CSVExport />} />
           <Route path="/logs" element={<Logs />} />

@@ -31,6 +31,10 @@ dashboard. In addition, activation automatically creates a public page at
 `/react-db-app/` containing the React interface so you can access the
 tool without visiting the admin area.
 
+Activation also creates a table named `wp_reactdb_logs` used to store
+operation logs. When the plugin is uninstalled, this table and the
+`react-db-app` page are removed automatically.
+
 If the page wasn't created for some reason, simply create a new page and
 insert the `[reactdb_app]` shortcode to embed the interface on the front
 end.
