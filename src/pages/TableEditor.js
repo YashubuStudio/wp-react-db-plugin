@@ -40,6 +40,14 @@ const TableEditor = () => {
     }).then(() => navigate(`/`));
   };
 
+  const handleDelete = () => {
+    fetch('/wp-json/reactdb/v1/table/delete', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': apiNonce },
+      body: JSON.stringify({ name: table, id })
+    }).then(() => navigate(`/`));
+  };
   return (
     <Box>
       {columns.map((col) => (
@@ -53,7 +61,8 @@ const TableEditor = () => {
           />
         )
       ))}
-      <Button variant="contained" onClick={handleSave}>保存</Button>
+      <Button variant="contained" onClick={handleSave} sx={{ mr: 2 }}>保存</Button>
+      {id && <Button color="error" variant="outlined" onClick={handleDelete}>削除</Button>}
     </Box>
   );
 };

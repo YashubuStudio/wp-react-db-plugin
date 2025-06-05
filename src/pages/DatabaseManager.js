@@ -20,6 +20,7 @@ const DatabaseManager = () => {
   const [selected, setSelected] = useState('');
   const [rows, setRows] = useState([]);
   const [newTable, setNewTable] = useState('');
+  const [copyName, setCopyName] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -112,7 +113,8 @@ const DatabaseManager = () => {
       .catch((e) => console.error(e));
   };
 
-  const handleCopy = (id) => {
+  const handleCopy = () => {
+    if (!selected || !copyName) return;
     fetch('/wp-json/reactdb/v1/table/copy', {
       method: 'POST',
       credentials: 'include',
@@ -120,9 +122,39 @@ const DatabaseManager = () => {
         'Content-Type': 'application/json',
         'X-WP-Nonce': apiNonce
       },
-      body: JSON.stringify({ name: selected, id })
+      body: JSON.stringify({ name: selected, new_name: copyName })
     })
-      .then(() => fetchRows(selected));
+      .then(() => {
+        setCopyName('');
+        return fetch('/wp-json/reactdb/v1/tables', {
+          credentials: 'include',
+          headers: { 'X-WP-Nonce': apiNonce }
+        });
+      })
+      .then(r => r.json())
+      .then(data => setTables(Array.isArray(data) ? data : []));
+  };
+
+  const handleDelete = (id) => {
+    fetch('/wp-json/reactdb/v1/table/delete', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-WP-Nonce': apiNonce
+      },
+      body: JSON.stringify({ name: selected, id })
+    }).then(() => fetchRows(selected));
+  };
+
+  const handleAdd = () => {
+    if (selected) {
+      navigate(`/edit/${selected}`);
+    }
+  };
+
+  const handleEdit = (id) => {
+    navigate(`/edit/${selected}/${id}`);
   };
 
   const handleEdit = (id) => {
@@ -144,40 +176,51 @@ const DatabaseManager = () => {
             </ListItem>
           ))}
         </List>
-        <Box sx={{ mt: 2 }}>
-          <TextField size="small" label="新規テーブル" value={newTable} onChange={(e) => setNewTable(e.target.value)} />
-          <Button size="small" sx={{ ml: 1 }} variant="contained" onClick={handleCreate}>作成</Button>
-        </Box>
+      <Box sx={{ mt: 2 }}>
+        <TextField size="small" label="新規テーブル" value={newTable} onChange={(e) => setNewTable(e.target.value)} />
+        <Button size="small" sx={{ ml: 1 }} variant="contained" onClick={handleCreate}>作成</Button>
       </Box>
-      <Box sx={{ flexGrow: 1 }}>
-        <Typography variant="h6" gutterBottom>
+      {selected && (
+        <Box sx={{ mt: 2 }}>
+          <TextField size="small" label="コピー先テーブル名" value={copyName} onChange={(e) => setCopyName(e.target.value)} />
+          <Button size="small" sx={{ ml: 1 }} onClick={handleCopy}>複製</Button>
+        </Box>
+      )}
+    </Box>
+    <Box sx={{ flexGrow: 1 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+        <Typography variant="h6" sx={{ flexGrow: 1 }}>
           テーブル内容
         </Typography>
-        <Paper variant="outlined">
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                {rows[0]?.map((h, i) => (
-                  <TableCell key={i}>{h}</TableCell>
-                ))}
-                {selected && <TableCell />}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {rows.slice(1).map((row, i) => (
-                <TableRow key={i}>
-                  {row.map((cell, j) => (
-                    <TableCell key={j}>{cell}</TableCell>
-                  ))}
-                  {selected && (
-                    <TableCell>
-                      <Button size="small" onClick={() => handleCopy(row[0])}>コピー</Button>
-                      <Button size="small" sx={{ ml: 1 }} onClick={() => handleEdit(row[0])}>編集</Button>
-                    </TableCell>
-                  )}
-                </TableRow>
+        {selected && (
+          <Button size="small" variant="outlined" onClick={handleAdd}>追加</Button>
+        )}
+      </Box>
+      <Paper variant="outlined">
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              {rows[0]?.map((h, i) => (
+                <TableCell key={i}>{h}</TableCell>
               ))}
-            </TableBody>
+              {selected && <TableCell />}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {rows.slice(1).map((row, i) => (
+              <TableRow key={i}>
+                {row.map((cell, j) => (
+                  <TableCell key={j}>{cell}</TableCell>
+                ))}
+                {selected && (
+                  <TableCell>
+                    <Button size="small" color="error" onClick={() => handleDelete(row[0])}>削除</Button>
+                    <Button size="small" sx={{ ml: 1 }} onClick={() => handleEdit(row[0])}>編集</Button>
+                  </TableCell>
+                )}
+              </TableRow>
+            ))}
+          </TableBody>
           </Table>
         </Paper>
       </Box>
