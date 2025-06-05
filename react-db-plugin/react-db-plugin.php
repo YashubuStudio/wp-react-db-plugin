@@ -30,11 +30,12 @@ add_action('admin_menu', function() {
                 [],
                 $ver
             );
-            $user = wp_get_current_user();
+            $user  = wp_get_current_user();
             wp_localize_script('react-db-plugin-script', 'ReactDbGlobals', [
                 'isPlugin'    => true,
                 'currentUser' => $user->display_name,
-                'logoutUrl'   => wp_logout_url()
+                'logoutUrl'   => wp_logout_url(),
+                'nonce'       => wp_create_nonce('wp_rest')
             ]);
 
         }
