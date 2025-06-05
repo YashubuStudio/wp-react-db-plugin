@@ -153,9 +153,39 @@ add_action('rest_api_init', function () {
                 return $h ?: 'col';
             }, array_shift($rows));
 
+            $sample = array_slice($rows, 0, 100);
+            $types = [];
+            foreach ($header as $idx => $col) {
+                $values = array_column($sample, $idx);
+                $values = array_filter($values, function($v){ return $v !== '' && $v !== null; });
+                $type = 'TEXT';
+                if (!empty($values)) {
+                    $is_int = true;
+                    $is_float = true;
+                    $is_date = true;
+                    $max_len = 0;
+                    foreach ($values as $v) {
+                        $max_len = max($max_len, strlen($v));
+                        if (!preg_match('/^-?\d+$/', $v)) { $is_int = false; }
+                        if (!is_numeric($v)) { $is_float = false; }
+                        if (strtotime($v) === false) { $is_date = false; }
+                    }
+                    if ($is_int) {
+                        $type = 'BIGINT';
+                    } elseif ($is_float) {
+                        $type = 'DOUBLE';
+                    } elseif ($is_date) {
+                        $type = 'DATETIME';
+                    } elseif ($max_len <= 255) {
+                        $type = 'VARCHAR(255)';
+                    }
+                }
+                $types[$idx] = $type;
+            }
+
             $cols = ['id bigint(20) unsigned NOT NULL AUTO_INCREMENT'];
-            foreach ($header as $h) {
-                $cols[] = "$h TEXT";
+            foreach ($header as $idx => $h) {
+                $cols[] = "$h {$types[$idx]}";
             }
             $cols[] = 'PRIMARY KEY  (id)';
 

@@ -35,6 +35,11 @@ Activation also creates a table named `wp_reactdb_logs` used to store
 operation logs. When the plugin is uninstalled, this table and the
 `react-db-app` page are removed automatically.
 
+CSV files imported through the REST API are inspected to determine
+appropriate column types. The first 100 rows are sampled and columns are
+created as integers, floating point numbers, dates or text depending on
+their values.
+
 If the page wasn't created for some reason, simply create a new page and
 insert the `[reactdb_app]` shortcode to embed the interface on the front
 end.
