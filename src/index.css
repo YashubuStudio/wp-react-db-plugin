@@ -12,3 +12,13 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+body.admin-bar .react-db-header {
+  top: 32px;
+}
+
+@media (max-width: 782px) {
+  body.admin-bar .react-db-header {
+    top: 46px;
+  }
+}
