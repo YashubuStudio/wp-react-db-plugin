@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
@@ -15,7 +15,8 @@ const typeOptions = [
 ];
 
 const TableCreate = () => {
-  const [name, setName] = useState('');
+  const [searchParams] = useSearchParams();
+  const [name, setName] = useState(searchParams.get('name') || '');
   const [columns, setColumns] = useState([{ name: '', type: 'TEXT', default: '' }]);
   const navigate = useNavigate();
 
