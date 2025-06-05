@@ -18,6 +18,9 @@ const Logs = () => {
       fetch('/wp-json/reactdb/v1/logs')
         .then((r) => {
           if (!r.ok) {
+            if (r.status === 401) {
+              throw new Error('unauthorized');
+            }
             throw new Error('fetch failed');
           }
           return r.json();
@@ -31,10 +34,16 @@ const Logs = () => {
             ]);
           }
         })
-        .catch(() => {
-          setLogs([
-            { created_at: '-', user_id: '-', action: '-', description: '取得失敗' }
-          ]);
+        .catch((err) => {
+          if (err.message === 'unauthorized') {
+            setLogs([
+              { created_at: '-', user_id: '-', action: '-', description: '権限がありません' }
+            ]);
+          } else {
+            setLogs([
+              { created_at: '-', user_id: '-', action: '-', description: '取得失敗' }
+            ]);
+          }
         })
         .finally(() => setLoading(false));
     } else {
