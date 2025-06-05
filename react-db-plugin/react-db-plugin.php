@@ -16,18 +16,19 @@ add_action('admin_menu', function() {
         'react-db-plugin',
         function() {
             echo '<div id="root"></div>';
+            $ver = file_exists(__DIR__ . '/assets/app.js') ? filemtime(__DIR__ . '/assets/app.js') : '1.0';
             wp_enqueue_script(
                 'react-db-plugin-script',
                 plugins_url('assets/app.js', __FILE__),
                 [],
-                '1.0',
+                $ver,
                 true
             );
             wp_enqueue_style(
                 'react-db-plugin-style',
                 plugins_url('assets/app.css', __FILE__),
                 [],
-                '1.0'
+                $ver
             );
             $user = wp_get_current_user();
             wp_localize_script('react-db-plugin-script', 'ReactDbGlobals', [

@@ -40,18 +40,19 @@ function reactdb_app_shortcode() {
     ob_start();
     echo '<div id="root"></div>';
 
+    $ver = file_exists(dirname(__DIR__) . '/assets/app.js') ? filemtime(dirname(__DIR__) . '/assets/app.js') : '1.0';
     wp_enqueue_script(
         'react-db-plugin-script',
         plugins_url('assets/app.js', dirname(__DIR__) . '/react-db-plugin.php'),
         [],
-        '1.0',
+        $ver,
         true
     );
     wp_enqueue_style(
         'react-db-plugin-style',
         plugins_url('assets/app.css', dirname(__DIR__) . '/react-db-plugin.php'),
         [],
-        '1.0'
+        $ver
     );
     $user = wp_get_current_user();
     wp_localize_script('react-db-plugin-script', 'ReactDbGlobals', [
