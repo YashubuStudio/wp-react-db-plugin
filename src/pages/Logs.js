@@ -11,23 +11,42 @@ import isPlugin from '../isPlugin';
 
 const Logs = () => {
   const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (isPlugin) {
       fetch('/wp-json/reactdb/v1/logs')
         .then((r) => r.json())
-        .then((data) => setLogs(data))
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setLogs(data);
+          } else {
+            setLogs([
+              { created_at: '-', user_id: '-', action: '-', description: '取得失敗' }
+            ]);
+          }
+        })
         .catch(() => {
           setLogs([
             { created_at: '-', user_id: '-', action: '-', description: '取得失敗' }
           ]);
-        });
+        })
+        .finally(() => setLoading(false));
     } else {
       setLogs([
         { created_at: '2024-01-01', user_id: 'demo', action: 'view', description: 'デモログ' }
       ]);
+      setLoading(false);
     }
   }, []);
+
+  if (loading) {
+    return (
+      <Box>
+        <Typography variant="h6">読み込み中...</Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box>
@@ -45,14 +64,22 @@ const Logs = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {logs.map((log, i) => (
-              <TableRow key={i}>
-                <TableCell>{log.created_at}</TableCell>
-                <TableCell>{log.user_id}</TableCell>
-                <TableCell>{log.action}</TableCell>
-                <TableCell>{log.description}</TableCell>
+            {logs.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} align="center">
+                  ログがありません
+                </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              logs.map((log, i) => (
+                <TableRow key={i}>
+                  <TableCell>{log.created_at}</TableCell>
+                  <TableCell>{log.user_id}</TableCell>
+                  <TableCell>{log.action}</TableCell>
+                  <TableCell>{log.description}</TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </Paper>
