@@ -58,7 +58,8 @@ function reactdb_app_shortcode() {
     wp_localize_script('react-db-plugin-script', 'ReactDbGlobals', [
         'isPlugin'    => true,
         'currentUser' => $user->display_name,
-        'logoutUrl'   => wp_logout_url()
+        'logoutUrl'   => wp_logout_url(),
+        'nonce'       => wp_create_nonce('wp_rest')
     ]);
 
     return ob_get_clean();
