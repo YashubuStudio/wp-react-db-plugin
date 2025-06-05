@@ -8,39 +8,7 @@ Author: YourName
 
 defined('ABSPATH') || exit;
 
-add_action('admin_menu', function() {
-    add_menu_page(
-        'React DB App',
-        'React DB',
-        'manage_options',
-        'react-db-plugin',
-        function() {
-            echo '<div id="root"></div>';
-            $ver = file_exists(__DIR__ . '/assets/app.js') ? filemtime(__DIR__ . '/assets/app.js') : '1.0';
-            wp_enqueue_script(
-                'react-db-plugin-script',
-                plugins_url('assets/app.js', __FILE__),
-                [],
-                $ver,
-                true
-            );
-            wp_enqueue_style(
-                'react-db-plugin-style',
-                plugins_url('assets/app.css', __FILE__),
-                [],
-                $ver
-            );
-            $user  = wp_get_current_user();
-            wp_localize_script('react-db-plugin-script', 'ReactDbGlobals', [
-                'isPlugin'    => true,
-                'currentUser' => $user->display_name,
-                'logoutUrl'   => wp_logout_url(),
-                'nonce'       => wp_create_nonce('wp_rest')
-            ]);
-
-        }
-    );
-});
+// Admin menu entry removed -- the React app is now accessed via a dedicated page
 
 
 // REST APIを含める
