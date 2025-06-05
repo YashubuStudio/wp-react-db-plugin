@@ -4,6 +4,10 @@ const path = require('path');
 const buildDir = path.join(__dirname, '..', 'build');
 const targetDir = path.join(__dirname, '..', 'react-db-plugin', 'assets');
 
+if (!fs.existsSync(targetDir)) {
+  fs.mkdirSync(targetDir, { recursive: true });
+}
+
 function findFile(dir, pattern) {
   const files = fs.readdirSync(dir);
   const match = files.find(f => pattern.test(f));
