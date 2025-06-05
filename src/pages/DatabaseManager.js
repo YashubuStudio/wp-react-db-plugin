@@ -153,11 +153,7 @@ const DatabaseManager = () => {
     }
   };
 
-  const handleEdit = (id) => {
-    navigate(`/edit/${selected}/${id}`);
-  };
-
-  const handleEdit = (id) => {
+  const editRow = (id) => {
     navigate(`/edit/${selected}/${id}`);
   };
 
@@ -215,7 +211,7 @@ const DatabaseManager = () => {
                 {selected && (
                   <TableCell>
                     <Button size="small" color="error" onClick={() => handleDelete(row[0])}>削除</Button>
-                    <Button size="small" sx={{ ml: 1 }} onClick={() => handleEdit(row[0])}>編集</Button>
+                    <Button size="small" sx={{ ml: 1 }} onClick={() => editRow(row[0])}>編集</Button>
                   </TableCell>
                 )}
               </TableRow>
