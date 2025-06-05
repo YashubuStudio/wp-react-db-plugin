@@ -19,6 +19,9 @@ const DatabaseManager = () => {
       fetch('/wp-json/reactdb/v1/csv/read')
         .then((r) => {
           if (!r.ok) {
+            if (r.status === 401) {
+              throw new Error('unauthorized');
+            }
             throw new Error('fetch failed');
           }
           return r.json();
@@ -30,11 +33,18 @@ const DatabaseManager = () => {
             throw new Error('invalid data');
           }
         })
-        .catch(() => {
-          setRows([
-            ['id', 'name'],
-            ['1', 'データ取得失敗']
-          ]);
+        .catch((err) => {
+          if (err.message === 'unauthorized') {
+            setRows([
+              ['Error'],
+              ['権限がありません']
+            ]);
+          } else {
+            setRows([
+              ['id', 'name'],
+              ['1', 'データ取得失敗']
+            ]);
+          }
         });
     } else {
       setRows([
