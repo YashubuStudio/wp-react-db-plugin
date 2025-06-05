@@ -21,3 +21,7 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# plugin build output
+react-db-plugin/assets/*
+!react-db-plugin/assets/.gitkeep
