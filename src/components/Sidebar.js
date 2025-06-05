@@ -17,7 +17,7 @@ const navItems = [
 
 const drawerWidth = 240;
 
-const Sidebar = () => (
+const Sidebar = ({ adminBarHeight = 0 }) => (
   <Drawer
     variant="permanent"
     sx={{
@@ -27,8 +27,8 @@ const Sidebar = () => (
         width: drawerWidth,
         boxSizing: 'border-box',
         backgroundColor: '#fff',
-        top: 64,
-        height: 'calc(100% - 64px)'
+        top: 64 + adminBarHeight,
+        height: `calc(100% - ${64 + adminBarHeight}px)`
       }
     }}
   >

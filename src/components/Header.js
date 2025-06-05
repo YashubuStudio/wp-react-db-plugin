@@ -5,8 +5,13 @@ import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import { currentUser, logoutUrl } from '../isPlugin';
 
-const Header = () => (
-  <AppBar position="fixed" color="default" sx={{ backgroundColor: '#fff' }}>
+const Header = ({ adminBarHeight = 0 }) => (
+  <AppBar
+    className="react-db-header"
+    position="fixed"
+    color="default"
+    sx={{ backgroundColor: '#fff', top: adminBarHeight }}
+  >
     <Toolbar>
       <Typography variant="h6" sx={{ flexGrow: 1 }}>
         React DB Manager
