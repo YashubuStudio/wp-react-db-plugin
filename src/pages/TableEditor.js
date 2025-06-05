@@ -76,21 +76,23 @@ const TableEditor = () => {
     }).then(() => navigate(`/`));
   };
   return (
-    <Box>
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
       {columns.map((col) => (
         col.Field !== 'id' && (
-          <Box key={col.Field} sx={{ display: 'flex', alignItems: 'center', mb: 2, mr: 2 }}>
+          <React.Fragment key={col.Field}>
             <TextField
               label={col.Field}
               value={data[col.Field] || ''}
               onChange={(e) => handleChange(col.Field, e.target.value)}
-              sx={{ mr: 1 }}
+              sx={{ mb: 2, mr: 1 }}
               InputProps={{ readOnly: isReadonly(col) }}
             />
             {col.Field === 'user_id' && userNames[data[col.Field]] && (
-              <span>({userNames[data[col.Field]]})</span>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, mr: 2 }}>
+                ({userNames[data[col.Field]]})
+              </Box>
             )}
-          </Box>
+          </React.Fragment>
         )
       ))}
       <Button variant="contained" onClick={handleSave} sx={{ mr: 2 }}>保存</Button>
