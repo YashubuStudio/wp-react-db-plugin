@@ -10,6 +10,7 @@ import Toolbar from '@mui/material/Toolbar';
 const navItems = [
   { text: 'CSVインポート', to: '/import' },
   { text: 'CSVエクスポート', to: '/export' },
+  { text: 'DB登録', to: '/create' },
   { text: 'データベース一覧', to: '/' },
   { text: '操作ログ', to: '/logs' }
 ];
