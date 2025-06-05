@@ -65,6 +65,7 @@ function reactdb_app_shortcode() {
         "var h=location.hash.replace(/^#/, '');" .
         "if(/^\\/?db\\/?$/.test(h)){location.hash='#/';}" .
         "if(/\\/db\\/?$/.test(location.pathname)){location.pathname=location.pathname.replace(/\\/db\\/?$/, '/');}}" .
+        "reactdb_fix();" .
         "window.addEventListener('hashchange',reactdb_fix);document.addEventListener('DOMContentLoaded',reactdb_fix);",
         'after'
     );
