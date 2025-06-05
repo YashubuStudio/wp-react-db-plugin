@@ -17,8 +17,19 @@ const DatabaseManager = () => {
   useEffect(() => {
     if (isPlugin) {
       fetch('/wp-json/reactdb/v1/csv/read')
-        .then((r) => r.json())
-        .then((data) => setRows(data))
+        .then((r) => {
+          if (!r.ok) {
+            throw new Error('fetch failed');
+          }
+          return r.json();
+        })
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setRows(data);
+          } else {
+            throw new Error('invalid data');
+          }
+        })
         .catch(() => {
           setRows([
             ['id', 'name'],

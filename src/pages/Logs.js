@@ -16,7 +16,12 @@ const Logs = () => {
   useEffect(() => {
     if (isPlugin) {
       fetch('/wp-json/reactdb/v1/logs')
-        .then((r) => r.json())
+        .then((r) => {
+          if (!r.ok) {
+            throw new Error('fetch failed');
+          }
+          return r.json();
+        })
         .then((data) => {
           if (Array.isArray(data)) {
             setLogs(data);
