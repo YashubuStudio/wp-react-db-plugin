@@ -92,25 +92,8 @@ const DatabaseManager = () => {
 
   const handleCreate = () => {
     if (!newTable) return;
-    fetch('/wp-json/reactdb/v1/table/create', {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-WP-Nonce': apiNonce
-      },
-      body: JSON.stringify({ name: newTable })
-    })
-      .then(() => {
-        setNewTable('');
-        return fetch('/wp-json/reactdb/v1/tables', {
-          credentials: 'include',
-          headers: { 'X-WP-Nonce': apiNonce }
-        });
-      })
-      .then((r) => r.json())
-      .then((data) => setTables(Array.isArray(data) ? data : []))
-      .catch((e) => console.error(e));
+    navigate(`/create?name=${encodeURIComponent(newTable)}`);
+    setNewTable('');
   };
 
   const handleCopy = () => {
