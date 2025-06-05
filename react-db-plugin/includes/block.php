@@ -1,10 +1,14 @@
 <?php
 function reactdb_register_block() {
+    $ver = file_exists(dirname(__DIR__) . '/assets/block.js')
+        ? filemtime(dirname(__DIR__) . '/assets/block.js')
+        : '1.0';
+
     wp_register_script(
         'reactdb-block',
         plugins_url('assets/block.js', dirname(__DIR__) . '/react-db-plugin.php'),
         ['wp-blocks', 'wp-element', 'wp-components'],
-        '1.0',
+        $ver,
         true
     );
 
@@ -12,7 +16,7 @@ function reactdb_register_block() {
         'reactdb-block-style',
         plugins_url('assets/block.css', dirname(__DIR__) . '/react-db-plugin.php'),
         [],
-        '1.0'
+        $ver
     );
 
     register_block_type('reactdb/block', [
