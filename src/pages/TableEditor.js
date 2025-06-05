@@ -10,6 +10,14 @@ const TableEditor = () => {
   const navigate = useNavigate();
   const [data, setData] = useState({});
   const [columns, setColumns] = useState([]);
+  const [userNames, setUserNames] = useState({});
+
+  const isReadonly = (col) => {
+    const name = col.Field.toLowerCase();
+    if (col.Extra && col.Extra.includes('auto_increment')) return true;
+    if (col.Default === 'CURRENT_TIMESTAMP') return true;
+    return name === 'created_at' || name === 'updated_at';
+  };
 
   useEffect(() => {
     if (!table) return;
@@ -25,13 +33,32 @@ const TableEditor = () => {
     }
   }, [table, id]);
 
+  useEffect(() => {
+    const uid = data.user_id;
+    if (uid && isPlugin && !userNames[uid]) {
+      fetch(`/wp-json/reactdb/v1/user/${uid}`, { headers: { 'X-WP-Nonce': apiNonce }, credentials: 'include' })
+        .then(r => r.ok ? r.json() : null)
+        .then(u => {
+          if (u && u.name) {
+            setUserNames(prev => ({ ...prev, [uid]: u.name }));
+          }
+        });
+    }
+  }, [data.user_id]);
+
   const handleChange = (field, value) => {
     setData({ ...data, [field]: value });
   };
 
   const handleSave = () => {
     const endpoint = id ? '/wp-json/reactdb/v1/table/update' : '/wp-json/reactdb/v1/table/addrow';
-    const body = id ? { name: table, id, data } : { name: table, data };
+    const sanitized = { ...data };
+    columns.forEach(col => {
+      if (isReadonly(col)) {
+        delete sanitized[col.Field];
+      }
+    });
+    const body = id ? { name: table, id, data: sanitized } : { name: table, data: sanitized };
     fetch(endpoint, {
       method: 'POST',
       credentials: 'include',
@@ -49,16 +76,23 @@ const TableEditor = () => {
     }).then(() => navigate(`/`));
   };
   return (
-    <Box>
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
       {columns.map((col) => (
         col.Field !== 'id' && (
-          <TextField
-            key={col.Field}
-            label={col.Field}
-            value={data[col.Field] || ''}
-            onChange={(e) => handleChange(col.Field, e.target.value)}
-            sx={{ mb: 2, mr: 2 }}
-          />
+          <React.Fragment key={col.Field}>
+            <TextField
+              label={col.Field}
+              value={data[col.Field] || ''}
+              onChange={(e) => handleChange(col.Field, e.target.value)}
+              sx={{ mb: 2, mr: 1 }}
+              InputProps={{ readOnly: isReadonly(col) }}
+            />
+            {col.Field === 'user_id' && userNames[data[col.Field]] && (
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, mr: 2 }}>
+                ({userNames[data[col.Field]]})
+              </Box>
+            )}
+          </React.Fragment>
         )
       ))}
       <Button variant="contained" onClick={handleSave} sx={{ mr: 2 }}>保存</Button>
