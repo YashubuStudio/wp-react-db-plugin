@@ -116,6 +116,70 @@ add_action('rest_api_init', function () {
         }
     ]);
 
+    register_rest_route('reactdb/v1', '/table/import', [
+        'methods'  => 'POST',
+        'callback' => function (WP_REST_Request $request) {
+            global $wpdb;
+
+            $files = $request->get_file_params();
+            $uploaded = isset($files['file']) ? $files['file'] : null;
+            if (!$uploaded || !is_uploaded_file($uploaded['tmp_name'])) {
+                return new WP_Error('invalid_file', 'CSV file required', ['status' => 400]);
+            }
+
+            $name = sanitize_key($request->get_param('table'));
+            if (!$name) {
+                $name = pathinfo($uploaded['name'], PATHINFO_FILENAME);
+                $name = preg_replace('/[^A-Za-z0-9_]/', '_', $name);
+                $name = sanitize_key($name);
+            }
+            if (!$name) {
+                return new WP_Error('invalid_name', 'Invalid table name', ['status' => 400]);
+            }
+
+            $table  = $wpdb->prefix . 'reactdb_' . $name;
+            if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table))) {
+                return new WP_Error('table_exists', 'Table already exists', ['status' => 409]);
+            }
+
+            $rows = CSVHandler::readCSV($uploaded['tmp_name']);
+            if (!$rows || count($rows) < 1) {
+                return new WP_Error('invalid_csv', 'CSV is empty', ['status' => 400]);
+            }
+
+            $charset_collate = $wpdb->get_charset_collate();
+            $header = array_map(function ($h) {
+                $h = sanitize_key($h);
+                return $h ?: 'col';
+            }, array_shift($rows));
+
+            $cols = ['id bigint(20) unsigned NOT NULL AUTO_INCREMENT'];
+            foreach ($header as $h) {
+                $cols[] = "$h TEXT";
+            }
+            $cols[] = 'PRIMARY KEY  (id)';
+
+            $sql = "CREATE TABLE $table (" . implode(',', $cols) . ") $charset_collate";
+            require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+            dbDelta($sql);
+
+            foreach ($rows as $r) {
+                $data = array();
+                foreach ($header as $idx => $col) {
+                    $data[$col] = isset($r[$idx]) ? $r[$idx] : '';
+                }
+                $wpdb->insert($table, $data);
+            }
+
+            LogHandler::addLog(get_current_user_id(), 'Import Table', $name);
+
+            return ['status' => 'imported', 'table' => $name];
+        },
+        'permission_callback' => function () {
+            return current_user_can('manage_options');
+        }
+    ]);
+
     register_rest_route('reactdb/v1', '/table/copy', [
         'methods'  => 'POST',
         'callback' => function (WP_REST_Request $request) {
