@@ -35,6 +35,16 @@ add_action('admin_menu', function() {
                 'currentUser' => $user->display_name,
                 'logoutUrl'   => wp_logout_url()
             ]);
+            wp_add_inline_script(
+                'react-db-plugin-script',
+                "function reactdb_fix(){" .
+                "var h=location.hash.replace(/^#/, '');" .
+                "if(/^\\/?db\\/?$/.test(h)){location.hash='#/';}" .
+                "if(/\\/db\\/?$/.test(location.pathname)){location.pathname=location.pathname.replace(/\\/db\\/?$/, '/');}}" .
+                "reactdb_fix();" .
+                "window.addEventListener('hashchange',reactdb_fix);document.addEventListener('DOMContentLoaded',reactdb_fix);",
+                'after'
+            );
         }
     );
 });
