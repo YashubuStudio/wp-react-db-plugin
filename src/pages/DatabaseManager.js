@@ -157,6 +157,10 @@ const DatabaseManager = () => {
     navigate(`/edit/${selected}/${id}`);
   };
 
+  const handleEdit = (id) => {
+    navigate(`/edit/${selected}/${id}`);
+  };
+
   return (
     <Box sx={{ display: 'flex' }}>
       <Box sx={{ width: 300, pr: 2 }}>

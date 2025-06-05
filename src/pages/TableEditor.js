@@ -48,7 +48,6 @@ const TableEditor = () => {
       body: JSON.stringify({ name: table, id })
     }).then(() => navigate(`/`));
   };
-
   return (
     <Box>
       {columns.map((col) => (
