@@ -58,14 +58,40 @@ add_action('rest_api_init', function () {
         'callback' => function (WP_REST_Request $request) {
             global $wpdb;
             $name = sanitize_key($request->get_param('name'));
+            $columns = $request->get_param('columns');
             if (!$name) {
                 return new WP_Error('invalid_name', 'Invalid table name', ['status' => 400]);
             }
+
             $table = $wpdb->prefix . 'reactdb_' . $name;
             $charset_collate = $wpdb->get_charset_collate();
-            $sql = "CREATE TABLE $table (id bigint(20) unsigned NOT NULL AUTO_INCREMENT, value text NOT NULL, PRIMARY KEY  (id)) $charset_collate";
+
+            $cols = [ 'id bigint(20) unsigned NOT NULL AUTO_INCREMENT' ];
+            if (is_array($columns)) {
+                $allowed = [ 'INT', 'VARCHAR(255)', 'TEXT', 'DATETIME' ];
+                foreach ($columns as $col) {
+                    $cname = isset($col['name']) ? sanitize_key($col['name']) : '';
+                    $ctype = isset($col['type']) ? strtoupper($col['type']) : '';
+                    $default = isset($col['default']) ? $col['default'] : null;
+                    if (!$cname || !in_array($ctype, $allowed, true)) {
+                        continue;
+                    }
+                    $def = '';
+                    if ($default !== null && $default !== '') {
+                        $def = " DEFAULT '" . esc_sql($default) . "'";
+                    }
+                    $cols[] = "$cname $ctype$def";
+                }
+            }
+            $cols[] = 'PRIMARY KEY  (id)';
+
+            $sql = "CREATE TABLE $table (" . implode(',', $cols) . ") $charset_collate";
+
             require_once ABSPATH . 'wp-admin/includes/upgrade.php';
             dbDelta($sql);
+
+            LogHandler::addLog(get_current_user_id(), 'Create Table', $name);
+
             return ['status' => 'created'];
         },
         'permission_callback' => function () {
@@ -106,6 +132,89 @@ add_action('rest_api_init', function () {
             }
             $wpdb->insert($table, ['value' => $row['value']]);
             return ['status' => 'copied'];
+        },
+        'permission_callback' => function () {
+            return current_user_can('manage_options');
+        }
+    ]);
+
+    register_rest_route('reactdb/v1', '/table/info', [
+        'methods'  => 'GET',
+        'callback' => function (WP_REST_Request $request) {
+            global $wpdb;
+            $name = sanitize_key($request->get_param('name'));
+            $table = $wpdb->prefix . 'reactdb_' . $name;
+            if (!$wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table))) {
+                return new WP_Error('invalid_table', 'Table not found', ['status' => 404]);
+            }
+            $cols = $wpdb->get_results("DESCRIBE $table", ARRAY_A);
+            return $cols;
+        },
+        'permission_callback' => function () {
+            return current_user_can('manage_options');
+        }
+    ]);
+
+    register_rest_route('reactdb/v1', '/table/row', [
+        'methods'  => 'GET',
+        'callback' => function (WP_REST_Request $request) {
+            global $wpdb;
+            $name = sanitize_key($request->get_param('name'));
+            $id   = intval($request->get_param('id'));
+            $table = $wpdb->prefix . 'reactdb_' . $name;
+            if (!$wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table))) {
+                return new WP_Error('invalid_table', 'Table not found', ['status' => 404]);
+            }
+            $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id = %d", $id), ARRAY_A);
+            if (!$row) {
+                return new WP_Error('invalid_row', 'Row not found', ['status' => 404]);
+            }
+            return $row;
+        },
+        'permission_callback' => function () {
+            return current_user_can('manage_options');
+        }
+    ]);
+
+    register_rest_route('reactdb/v1', '/table/update', [
+        'methods'  => 'POST',
+        'callback' => function (WP_REST_Request $request) {
+            global $wpdb;
+            $name = sanitize_key($request->get_param('name'));
+            $id   = intval($request->get_param('id'));
+            $data = $request->get_param('data');
+            if (!is_array($data)) {
+                return new WP_Error('invalid_data', 'Invalid data', ['status' => 400]);
+            }
+            $table = $wpdb->prefix . 'reactdb_' . $name;
+            if (!$wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table))) {
+                return new WP_Error('invalid_table', 'Table not found', ['status' => 404]);
+            }
+            $wpdb->update($table, $data, ['id' => $id]);
+            LogHandler::addLog(get_current_user_id(), 'Update Row', $name);
+            return ['status' => 'updated'];
+        },
+        'permission_callback' => function () {
+            return current_user_can('manage_options');
+        }
+    ]);
+
+    register_rest_route('reactdb/v1', '/table/addrow', [
+        'methods'  => 'POST',
+        'callback' => function (WP_REST_Request $request) {
+            global $wpdb;
+            $name = sanitize_key($request->get_param('name'));
+            $data = $request->get_param('data');
+            if (!is_array($data)) {
+                return new WP_Error('invalid_data', 'Invalid data', ['status' => 400]);
+            }
+            $table = $wpdb->prefix . 'reactdb_' . $name;
+            if (!$wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table))) {
+                return new WP_Error('invalid_table', 'Table not found', ['status' => 404]);
+            }
+            $wpdb->insert($table, $data);
+            LogHandler::addLog(get_current_user_id(), 'Insert Row', $name);
+            return ['status' => 'inserted'];
         },
         'permission_callback' => function () {
             return current_user_can('manage_options');

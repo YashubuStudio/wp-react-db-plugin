@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import List from '@mui/material/List';
@@ -19,6 +20,7 @@ const DatabaseManager = () => {
   const [selected, setSelected] = useState('');
   const [rows, setRows] = useState([]);
   const [newTable, setNewTable] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (isPlugin) {
@@ -61,12 +63,21 @@ const DatabaseManager = () => {
       })
         .then((r) => r.json())
         .then((data) => {
-          if (Array.isArray(data)) {
-            const header = data.length > 0 ? Object.keys(data[0]) : [];
+          if (Array.isArray(data) && data.length > 0) {
+            const header = Object.keys(data[0]);
             const body = data.map((row) => Object.values(row));
             setRows([header, ...body]);
           } else {
-            setRows([]);
+            fetch(`/wp-json/reactdb/v1/table/info?name=${table}`, {
+              credentials: 'include',
+              headers: { 'X-WP-Nonce': apiNonce }
+            })
+              .then((r) => r.json())
+              .then((cols) => {
+                const header = Array.isArray(cols) ? cols.map((c) => c.Field) : [];
+                setRows([header]);
+              })
+              .catch(() => setRows([]));
           }
         })
         .catch(() => setRows([]));
@@ -114,9 +125,13 @@ const DatabaseManager = () => {
       .then(() => fetchRows(selected));
   };
 
+  const handleEdit = (id) => {
+    navigate(`/edit/${selected}/${id}`);
+  };
+
   return (
     <Box sx={{ display: 'flex' }}>
-      <Box sx={{ width: 240, pr: 2 }}>
+      <Box sx={{ width: 300, pr: 2 }}>
         <Typography variant="h6" gutterBottom>
           テーブル一覧
         </Typography>
@@ -157,6 +172,7 @@ const DatabaseManager = () => {
                   {selected && (
                     <TableCell>
                       <Button size="small" onClick={() => handleCopy(row[0])}>コピー</Button>
+                      <Button size="small" sx={{ ml: 1 }} onClick={() => handleEdit(row[0])}>編集</Button>
                     </TableCell>
                   )}
                 </TableRow>
