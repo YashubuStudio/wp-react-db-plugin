@@ -11,6 +11,7 @@ import isPlugin from '../isPlugin';
 
 const Logs = () => {
   const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (isPlugin) {
@@ -29,13 +30,23 @@ const Logs = () => {
           setLogs([
             { created_at: '-', user_id: '-', action: '-', description: '取得失敗' }
           ]);
-        });
+        })
+        .finally(() => setLoading(false));
     } else {
       setLogs([
         { created_at: '2024-01-01', user_id: 'demo', action: 'view', description: 'デモログ' }
       ]);
+      setLoading(false);
     }
   }, []);
+
+  if (loading) {
+    return (
+      <Box>
+        <Typography variant="h6">読み込み中...</Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box>
