@@ -12,6 +12,7 @@ import isPlugin, { apiNonce } from '../isPlugin';
 const Logs = () => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [userNames, setUserNames] = useState({});
 
   useEffect(() => {
     if (isPlugin) {
@@ -59,6 +60,21 @@ const Logs = () => {
     }
   }, []);
 
+  useEffect(() => {
+    const ids = logs.map((l) => l.user_id).filter((id) => id && !userNames[id]);
+    ids.forEach((id) => {
+      if (isPlugin) {
+        fetch(`/wp-json/reactdb/v1/user/${id}`, { headers: { 'X-WP-Nonce': apiNonce }, credentials: 'include' })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((u) => {
+            if (u && u.name) {
+              setUserNames((prev) => ({ ...prev, [id]: u.name }));
+            }
+          });
+      }
+    });
+  }, [logs]);
+
   if (loading) {
     return (
       <Box>
@@ -93,7 +109,7 @@ const Logs = () => {
               logs.map((log, i) => (
                 <TableRow key={i}>
                   <TableCell>{log.created_at}</TableCell>
-                  <TableCell>{log.user_id}</TableCell>
+                  <TableCell>{userNames[log.user_id] ? `${log.user_id}(${userNames[log.user_id]})` : log.user_id}</TableCell>
                   <TableCell>{log.action}</TableCell>
                   <TableCell>{log.description}</TableCell>
                 </TableRow>

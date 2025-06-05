@@ -340,4 +340,21 @@ add_action('rest_api_init', function () {
             return current_user_can('manage_options');
         }
     ]);
+
+    register_rest_route('reactdb/v1', '/user/(?P<id>\d+)', [
+        'methods'  => 'GET',
+        'callback' => function (WP_REST_Request $request) {
+            $user = get_user_by('id', intval($request['id']));
+            if (!$user) {
+                return new WP_Error('invalid_user', 'User not found', ['status' => 404]);
+            }
+            return [
+                'id'   => $user->ID,
+                'name' => $user->user_login
+            ];
+        },
+        'permission_callback' => function () {
+            return current_user_can('manage_options');
+        }
+    ]);
 });
