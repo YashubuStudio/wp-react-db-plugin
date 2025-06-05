@@ -37,9 +37,10 @@ add_action('admin_menu', function() {
             ]);
             wp_add_inline_script(
                 'react-db-plugin-script',
-                "function reactdb_fix(){var h=location.hash.replace(/^#/, '');" .
-                "if(h.startsWith('/db')||h==='db'){location.hash='#/';}" .
-                "if(location.pathname.endsWith('/db')){location.pathname=location.pathname.replace(/\\/db$/, '/');}}" .
+                "function reactdb_fix(){" .
+                "var h=location.hash.replace(/^#/, '');" .
+                "if(/^\\/?db\\/?$/.test(h)){location.hash='#/';}" .
+                "if(/\\/db\\/?$/.test(location.pathname)){location.pathname=location.pathname.replace(/\\/db\\/?$/, '/');}}" .
                 "window.addEventListener('hashchange',reactdb_fix);document.addEventListener('DOMContentLoaded',reactdb_fix);",
                 'after'
             );
