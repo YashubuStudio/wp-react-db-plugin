@@ -15,6 +15,8 @@ import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import isPlugin, { apiNonce } from '../isPlugin';
 
+const protectedTables = ['logs'];
+
 const DatabaseManager = () => {
   const [tables, setTables] = useState([]);
   const [selected, setSelected] = useState('');
@@ -118,6 +120,27 @@ const DatabaseManager = () => {
       .then(data => setTables(Array.isArray(data) ? data : []));
   };
 
+  const handleDropTable = () => {
+    if (!selected || protectedTables.includes(selected)) return;
+    if (!window.confirm(`${selected} を削除します。よろしいですか？`)) return;
+    fetch('/wp-json/reactdb/v1/table/drop', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-WP-Nonce': apiNonce
+      },
+      body: JSON.stringify({ name: selected })
+    })
+      .then(() => fetch('/wp-json/reactdb/v1/tables', { credentials: 'include', headers: { 'X-WP-Nonce': apiNonce } }))
+      .then(r => r.json())
+      .then(data => {
+        setTables(Array.isArray(data) ? data : []);
+        setSelected('');
+        setRows([]);
+      });
+  };
+
   const handleDelete = (id) => {
     fetch('/wp-json/reactdb/v1/table/delete', {
       method: 'POST',
@@ -163,6 +186,11 @@ const DatabaseManager = () => {
         <Box sx={{ mt: 2 }}>
           <TextField size="small" label="コピー先テーブル名" value={copyName} onChange={(e) => setCopyName(e.target.value)} />
           <Button size="small" sx={{ ml: 1 }} onClick={handleCopy}>複製</Button>
+        </Box>
+      )}
+      {selected && !protectedTables.includes(selected) && (
+        <Box sx={{ mt: 2 }}>
+          <Button size="small" color="error" onClick={handleDropTable}>テーブル削除</Button>
         </Box>
       )}
     </Box>
