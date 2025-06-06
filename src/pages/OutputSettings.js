@@ -14,6 +14,23 @@ const OutputSettings = () => {
   const [format, setFormat] = useState('html');
   const [tables, setTables] = useState([]);
 
+  const deleteTask = (name) => {
+    const newSettings = { ...settings };
+    delete newSettings[name];
+    if (isPlugin) {
+      fetch('/wp-json/reactdb/v1/output/settings', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': apiNonce },
+        body: JSON.stringify({ settings: newSettings })
+      })
+        .then(r => r.json())
+        .then(data => setSettings(data));
+    } else {
+      setSettings(newSettings);
+    }
+  };
+
   useEffect(() => {
     if (isPlugin) {
       fetch('/wp-json/reactdb/v1/output/settings', {
@@ -69,8 +86,11 @@ const OutputSettings = () => {
       <Box>
         {Object.keys(settings).length === 0 && <div>設定なし</div>}
         {Object.entries(settings).map(([name, conf]) => (
-          <Box key={name}>
+          <Box key={name} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Link to={`/output/${name}`}>{name}</Link>: {conf.table} ({conf.format})
+            <Button size="small" color="error" onClick={() => deleteTask(name)}>
+              削除
+            </Button>
           </Box>
         ))}
       </Box>
