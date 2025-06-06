@@ -9,6 +9,7 @@ import TableCreate from './pages/TableCreate';
 import TableEditor from './pages/TableEditor';
 import Logs from './pages/Logs';
 import OutputSettings from './pages/OutputSettings';
+import OutputTask from './pages/OutputTask';
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
           <Route path="/export" element={<CSVExport />} />
           <Route path="/logs" element={<Logs />} />
           <Route path="/output" element={<OutputSettings />} />
+          <Route path="/output/:task" element={<OutputTask />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
