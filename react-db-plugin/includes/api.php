@@ -368,4 +368,13 @@ add_action('rest_api_init', function () {
             return current_user_can('manage_options');
         }
     ]);
+
+    // Output API - public access
+    register_rest_route('reactdb/v1', '/output/(?P<task>[A-Za-z0-9_-]+)', [
+        'methods'  => 'GET',
+        'callback' => function (WP_REST_Request $request) {
+            return OutputHandler::get_output($request['task']);
+        },
+        'permission_callback' => '__return_true'
+    ]);
 });

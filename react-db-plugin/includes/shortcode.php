@@ -31,6 +31,17 @@ function reactdb_shortcode($atts) {
 }
 add_shortcode('reactdb', 'reactdb_shortcode');
 
+function reactdb_output_shortcode($atts) {
+    $atts = shortcode_atts([
+        'task' => ''
+    ], $atts);
+    if (!$atts['task']) {
+        return '<div>No task specified</div>';
+    }
+    return OutputHandler::render_html($atts['task']);
+}
+add_shortcode('reactdb_output', 'reactdb_output_shortcode');
+
 function reactdb_app_shortcode() {
     if (!is_user_logged_in()) {
         return '<p>Please log in to view this page.</p>';
