@@ -6,6 +6,7 @@ import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import isPlugin, { apiNonce } from '../isPlugin';
+import HTMLPreview from '../components/HTMLPreview';
 
 const OutputTask = () => {
   const { task } = useParams();
@@ -13,10 +14,12 @@ const OutputTask = () => {
   const [config, setConfig] = useState({ table: '', format: 'html', html: '' });
   const [tables, setTables] = useState([]);
   const [columns, setColumns] = useState([]);
-  // fetch columns and generate template when table selected
+  const [sampleRow, setSampleRow] = useState(null);
+  // fetch columns and sample row when table selected
   useEffect(() => {
     if (!config.table) {
       setColumns([]);
+      setSampleRow(null);
       return;
     }
     const handleCols = (cols) => {
@@ -37,8 +40,16 @@ const OutputTask = () => {
         .then(r => r.json())
         .then(data => handleCols(Array.isArray(data) ? data.map(c => c.Field) : []))
         .catch(() => handleCols([]));
+      fetch(`/wp-json/reactdb/v1/table/export?name=${config.table}`, {
+        credentials: 'include',
+        headers: { 'X-WP-Nonce': apiNonce }
+      })
+        .then(r => r.json())
+        .then(rows => setSampleRow(Array.isArray(rows) && rows.length > 0 ? rows[0] : null))
+        .catch(() => setSampleRow(null));
     } else {
       handleCols(['id', 'value']);
+      setSampleRow({ id: 1, value: 'sample' });
     }
   }, [config.table, config.format]);
 
@@ -88,20 +99,40 @@ const OutputTask = () => {
     }
   };
 
+  const handleDelete = () => {
+    if (!task) return;
+    const newSettings = { ...settings };
+    delete newSettings[task];
+    if (isPlugin) {
+      fetch('/wp-json/reactdb/v1/output/settings', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': apiNonce },
+        body: JSON.stringify({ settings: newSettings })
+      })
+        .then(r => r.json())
+        .then(data => setSettings(data));
+    } else {
+      setSettings(newSettings);
+    }
+  };
+
   const endpoint = `/wp-json/reactdb/v1/output/${task}`;
+  const previewData = sampleRow || columns.reduce((acc, col) => ({ ...acc, [col]: col }), {});
 
   return (
     <Box>
       <Typography variant="h5" gutterBottom>タスク設定: {task}</Typography>
-      <Box sx={{ display: 'flex', flexDirection: 'column', maxWidth: 600 }}>
-        <TextField select label="テーブル" value={config.table} onChange={e => setConfig({ ...config, table: e.target.value })} sx={{ mb: 2 }}>
-          <MenuItem value="">選択</MenuItem>
-          {tables.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
-        </TextField>
-        <TextField select label="形式" value={config.format} onChange={e => setConfig({ ...config, format: e.target.value })} sx={{ mb: 2 }}>
-          <MenuItem value="html">HTML</MenuItem>
-          <MenuItem value="json">JSON</MenuItem>
-        </TextField>
+      <Box sx={{ display: 'flex' }}>
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: 600 }}>
+          <TextField select label="テーブル" value={config.table} onChange={e => setConfig({ ...config, table: e.target.value })} sx={{ mb: 2 }}>
+            <MenuItem value="">選択</MenuItem>
+            {tables.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+          </TextField>
+          <TextField select label="形式" value={config.format} onChange={e => setConfig({ ...config, format: e.target.value })} sx={{ mb: 2 }}>
+            <MenuItem value="html">HTML</MenuItem>
+            <MenuItem value="json">JSON</MenuItem>
+          </TextField>
         {config.format === 'html' && columns.length > 0 && (
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
             {columns.map(c => (
@@ -122,7 +153,14 @@ const OutputTask = () => {
         {config.format === 'json' && (
           <Box sx={{ mb: 2 }}>エンドポイント: {endpoint}</Box>
         )}
-        <Button variant="contained" onClick={handleSave}>保存</Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button variant="contained" onClick={handleSave}>保存</Button>
+          <Button color="error" variant="outlined" onClick={handleDelete}>削除</Button>
+        </Box>
+        </Box>
+        {config.format === 'html' && (
+          <HTMLPreview html={config.html} data={previewData} />
+        )}
       </Box>
     </Box>
   );
