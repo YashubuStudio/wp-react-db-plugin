@@ -12,6 +12,28 @@ const OutputTask = () => {
   const [settings, setSettings] = useState({});
   const [config, setConfig] = useState({ table: '', format: 'html', html: '' });
   const [tables, setTables] = useState([]);
+  // generate template when table selected
+  useEffect(() => {
+    if (config.format !== 'html' || !config.table || config.html) return;
+    const gen = (cols) => {
+      if (!Array.isArray(cols) || cols.length === 0) return;
+      const snippet = `<div class="reactdb-row">\n  ${cols
+        .map(c => `{{${c}}}`)
+        .join(' | ')}\n</div>`;
+      setConfig(cfg => ({ ...cfg, html: snippet }));
+    };
+    if (isPlugin) {
+      fetch(`/wp-json/reactdb/v1/table/info?name=${config.table}`, {
+        credentials: 'include',
+        headers: { 'X-WP-Nonce': apiNonce }
+      })
+        .then(r => r.json())
+        .then(data => gen(Array.isArray(data) ? data.map(c => c.Field) : []))
+        .catch(() => {});
+    } else {
+      gen(['id', 'value']);
+    }
+  }, [config.table, config.format]);
 
   useEffect(() => {
     if (isPlugin) {
@@ -80,6 +102,9 @@ const OutputTask = () => {
           <Box sx={{ mb: 2 }}>エンドポイント: {endpoint}</Box>
         )}
         <Button variant="contained" onClick={handleSave}>保存</Button>
+        <Typography variant="body2" sx={{ mt: 2 }}>
+          ショートコード: [reactdb_output task="{task}"]
+        </Typography>
       </Box>
     </Box>
   );
