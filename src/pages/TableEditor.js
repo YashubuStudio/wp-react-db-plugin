@@ -14,7 +14,12 @@ const TableEditor = () => {
 
   const isReadonly = (col) => {
     const name = col.Field.toLowerCase();
-    if (col.Extra && col.Extra.includes('auto_increment')) return true;
+    const extra = (col.Extra || '').toLowerCase();
+    const def = (col.Default || '').toString().toLowerCase();
+    const type = (col.Type || '').toLowerCase();
+    if (extra.includes('auto_increment')) return true;
+    if (type.includes('timestamp') && (def.includes('current_timestamp') || extra.includes('current_timestamp')))
+      return true;
     if (col.Default === 'CURRENT_TIMESTAMP') return true;
     return name === 'created_at' || name === 'updated_at';
   };
