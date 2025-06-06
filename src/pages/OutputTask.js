@@ -12,15 +12,22 @@ const OutputTask = () => {
   const [settings, setSettings] = useState({});
   const [config, setConfig] = useState({ table: '', format: 'html', html: '' });
   const [tables, setTables] = useState([]);
-  // generate template when table selected
+  const [columns, setColumns] = useState([]);
+  // fetch columns and generate template when table selected
   useEffect(() => {
-    if (config.format !== 'html' || !config.table || config.html) return;
-    const gen = (cols) => {
-      if (!Array.isArray(cols) || cols.length === 0) return;
-      const snippet = `<div class="reactdb-row">\n  ${cols
-        .map(c => `{{${c}}}`)
-        .join(' | ')}\n</div>`;
-      setConfig(cfg => ({ ...cfg, html: snippet }));
+    if (!config.table) {
+      setColumns([]);
+      return;
+    }
+    const handleCols = (cols) => {
+      const names = Array.isArray(cols) ? cols : [];
+      setColumns(names);
+      if (config.format === 'html' && !config.html && names.length > 0) {
+        const snippet = `<div class="reactdb-row">\n  ${names
+          .map(c => `{{${c}}}`)
+          .join(' | ')}\n</div>`;
+        setConfig(cfg => ({ ...cfg, html: snippet }));
+      }
     };
     if (isPlugin) {
       fetch(`/wp-json/reactdb/v1/table/info?name=${config.table}`, {
@@ -28,10 +35,10 @@ const OutputTask = () => {
         headers: { 'X-WP-Nonce': apiNonce }
       })
         .then(r => r.json())
-        .then(data => gen(Array.isArray(data) ? data.map(c => c.Field) : []))
-        .catch(() => {});
+        .then(data => handleCols(Array.isArray(data) ? data.map(c => c.Field) : []))
+        .catch(() => handleCols([]));
     } else {
-      gen(['id', 'value']);
+      handleCols(['id', 'value']);
     }
   }, [config.table, config.format]);
 
@@ -95,6 +102,15 @@ const OutputTask = () => {
           <MenuItem value="html">HTML</MenuItem>
           <MenuItem value="json">JSON</MenuItem>
         </TextField>
+        {columns.length > 0 && (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+            {columns.map(c => (
+              <Box key={c} sx={{ px: 1, py: 0.5, border: '1px solid', borderColor: 'grey.400', borderRadius: 1 }}>
+                {c}
+              </Box>
+            ))}
+          </Box>
+        )}
         {config.format === 'html' && (
           <TextField label="HTML" multiline minRows={4} value={config.html} onChange={e => setConfig({ ...config, html: e.target.value })} sx={{ mb: 2 }} />
         )}
@@ -102,7 +118,7 @@ const OutputTask = () => {
           <Box sx={{ mb: 2 }}>エンドポイント: {endpoint}</Box>
         )}
         <Button variant="contained" onClick={handleSave}>保存</Button>
-        <Typography variant="body2" sx={{ mt: 2 }}>
+        <Typography variant="body1" sx={{ mt: 2, fontSize: '1rem' }}>
           ショートコード: [reactdb_output task="{task}"]
         </Typography>
       </Box>
