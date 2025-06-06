@@ -5,6 +5,8 @@ import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import MenuItem from '@mui/material/MenuItem';
 import Tooltip from '@mui/material/Tooltip';
+import Checkbox from '@mui/material/Checkbox';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import isPlugin, { apiNonce } from '../isPlugin';
 
 const typeOptions = [
@@ -18,6 +20,8 @@ const TableCreate = () => {
   const [searchParams] = useSearchParams();
   const [name, setName] = useState(searchParams.get('name') || '');
   const [columns, setColumns] = useState([{ name: '', type: 'TEXT', default: '' }]);
+  const [addCreated, setAddCreated] = useState(false);
+  const [addUpdated, setAddUpdated] = useState(false);
   const navigate = useNavigate();
 
   const addColumn = () => setColumns([...columns, { name: '', type: 'TEXT', default: '' }]);
@@ -30,11 +34,18 @@ const TableCreate = () => {
 
   const handleSubmit = () => {
     if (!name) return;
+    let cols = columns.slice();
+    if (addCreated) {
+      cols.push({ name: 'created_at', type: 'DATETIME', default: '' });
+    }
+    if (addUpdated) {
+      cols.push({ name: 'updated_at', type: 'DATETIME', default: '' });
+    }
     fetch('/wp-json/reactdb/v1/table/create', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': apiNonce },
-      body: JSON.stringify({ name, columns }),
+      body: JSON.stringify({ name, columns: cols }),
     }).then(() => navigate('/'));
   };
 
@@ -54,6 +65,17 @@ const TableCreate = () => {
           <TextField label="デフォルト" value={c.default} onChange={(e) => handleColChange(i, 'default', e.target.value)} />
         </Box>
       ))}
+      <Box sx={{ display: 'flex', mb: 2 }}>
+        <FormControlLabel
+          control={<Checkbox checked={addCreated} onChange={(e) => setAddCreated(e.target.checked)} />}
+          label="created_atを追加"
+          sx={{ mr: 2 }}
+        />
+        <FormControlLabel
+          control={<Checkbox checked={addUpdated} onChange={(e) => setAddUpdated(e.target.checked)} />}
+          label="updated_atを追加"
+        />
+      </Box>
       <Button onClick={addColumn} sx={{ mr: 2 }}>カラム追加</Button>
       <Button variant="contained" onClick={handleSubmit}>作成</Button>
     </Box>
