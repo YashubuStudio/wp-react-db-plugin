@@ -24,6 +24,11 @@ const TableEditor = () => {
     return name === 'created_at' || name === 'updated_at';
   };
 
+  const isHidden = (col) => {
+    const name = col.Field.toLowerCase();
+    return name === 'created_at' || name === 'updated_at';
+  };
+
   useEffect(() => {
     if (!table) return;
     if (isPlugin) {
@@ -82,23 +87,21 @@ const TableEditor = () => {
   };
   return (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
-      {columns.map((col) => (
-        col.Field !== 'id' && (
-          <React.Fragment key={col.Field}>
-            <TextField
-              label={col.Field}
-              value={data[col.Field] || ''}
-              onChange={(e) => handleChange(col.Field, e.target.value)}
-              sx={{ mb: 2, mr: 1 }}
-              InputProps={{ readOnly: isReadonly(col) }}
-            />
-            {col.Field === 'user_id' && userNames[data[col.Field]] && (
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, mr: 2 }}>
-                ({userNames[data[col.Field]]})
-              </Box>
-            )}
-          </React.Fragment>
-        )
+      {columns.filter(col => col.Field !== 'id' && !isHidden(col)).map((col) => (
+        <React.Fragment key={col.Field}>
+          <TextField
+            label={col.Field}
+            value={data[col.Field] || ''}
+            onChange={(e) => handleChange(col.Field, e.target.value)}
+            sx={{ mb: 2, mr: 1 }}
+            InputProps={{ readOnly: isReadonly(col) }}
+          />
+          {col.Field === 'user_id' && userNames[data[col.Field]] && (
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, mr: 2 }}>
+              ({userNames[data[col.Field]]})
+            </Box>
+          )}
+        </React.Fragment>
       ))}
       <Button variant="contained" onClick={handleSave} sx={{ mr: 2 }}>保存</Button>
       {id && <Button color="error" variant="outlined" onClick={handleDelete}>削除</Button>}
