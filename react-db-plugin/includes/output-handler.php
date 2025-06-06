@@ -1,0 +1,57 @@
+<?php
+class OutputHandler {
+    public static function get_settings() {
+        $settings = get_option('reactdb_output_settings', []);
+        return is_array($settings) ? $settings : [];
+    }
+
+    public static function get_task($task) {
+        $settings = self::get_settings();
+        return isset($settings[$task]) ? $settings[$task] : null;
+    }
+
+    public static function update_settings($settings) {
+        if (is_array($settings)) {
+            update_option('reactdb_output_settings', $settings);
+        }
+    }
+
+    public static function get_rows($table) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'reactdb_' . sanitize_key($table);
+        if (!$wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table))) {
+            return [];
+        }
+        return $wpdb->get_results("SELECT * FROM $table", ARRAY_A);
+    }
+
+    public static function render_html($task) {
+        $config = self::get_task($task);
+        if (!$config) {
+            return '<div>No settings</div>';
+        }
+        $rows = self::get_rows($config['table']);
+        if (!$rows) {
+            return '<div>No data</div>';
+        }
+        ob_start();
+        echo '<ul class="reactdb-output-list">';
+        foreach ($rows as $row) {
+            echo '<li>' . esc_html(join(' | ', $row)) . '</li>';
+        }
+        echo '</ul>';
+        return ob_get_clean();
+    }
+
+    public static function get_output($task) {
+        $config = self::get_task($task);
+        if (!$config) {
+            return new WP_Error('not_found', 'Task not found', ['status' => 404]);
+        }
+        $rows = self::get_rows($config['table']);
+        if ($config['format'] === 'json') {
+            return $rows;
+        }
+        return ['html' => self::render_html($task)];
+    }
+}
