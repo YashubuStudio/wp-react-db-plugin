@@ -352,6 +352,34 @@ add_action('rest_api_init', function () {
         }
     ]);
 
+    register_rest_route('reactdb/v1', '/table/drop', [
+        'methods'  => 'POST',
+        'callback' => function (WP_REST_Request $request) {
+            global $wpdb;
+            $name = sanitize_key($request->get_param('name'));
+            if (!$name) {
+                return new WP_Error('invalid_name', 'Invalid table name', ['status' => 400]);
+            }
+
+            $protected = [ 'logs' ];
+            if (in_array($name, $protected, true)) {
+                return new WP_Error('forbidden', 'Table cannot be deleted', ['status' => 403]);
+            }
+
+            $table = $wpdb->prefix . 'reactdb_' . $name;
+            if (!$wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table))) {
+                return new WP_Error('invalid_table', 'Table not found', ['status' => 404]);
+            }
+
+            $wpdb->query("DROP TABLE $table");
+            LogHandler::addLog(get_current_user_id(), 'Drop Table', $name);
+            return ['status' => 'dropped'];
+        },
+        'permission_callback' => function () {
+            return current_user_can('manage_options');
+        }
+    ]);
+
     register_rest_route('reactdb/v1', '/user/(?P<id>\d+)', [
         'methods'  => 'GET',
         'callback' => function (WP_REST_Request $request) {
