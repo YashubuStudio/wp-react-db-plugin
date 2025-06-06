@@ -112,15 +112,15 @@ const OutputTask = () => {
           </Box>
         )}
         {config.format === 'html' && (
-          <TextField label="HTML" multiline minRows={4} value={config.html} onChange={e => setConfig({ ...config, html: e.target.value })} sx={{ mb: 2 }} />
-        )}
-        {config.format === 'json' && (
           <>
-            <Box sx={{ mb: 2 }}>エンドポイント: {endpoint}</Box>
+            <TextField label="HTML" multiline minRows={4} value={config.html} onChange={e => setConfig({ ...config, html: e.target.value })} sx={{ mb: 2 }} />
             <Typography variant="body1" sx={{ mb: 2, fontSize: '1rem' }}>
               ショートコード: [reactdb_output task="{task}"]
             </Typography>
           </>
+        )}
+        {config.format === 'json' && (
+          <Box sx={{ mb: 2 }}>エンドポイント: {endpoint}</Box>
         )}
         <Button variant="contained" onClick={handleSave}>保存</Button>
       </Box>
