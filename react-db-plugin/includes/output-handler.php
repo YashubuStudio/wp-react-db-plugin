@@ -10,6 +10,12 @@ class OutputHandler {
         return isset($settings[$task]) ? $settings[$task] : null;
     }
 
+    public static function update_settings($settings) {
+        if (is_array($settings)) {
+            update_option('reactdb_output_settings', $settings);
+        }
+    }
+
     public static function get_rows($table) {
         global $wpdb;
         $table = $wpdb->prefix . 'reactdb_' . sanitize_key($table);

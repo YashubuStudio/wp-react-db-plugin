@@ -369,6 +369,32 @@ add_action('rest_api_init', function () {
         }
     ]);
 
+    // Output settings - admin access
+    register_rest_route('reactdb/v1', '/output/settings', [
+        'methods'  => 'GET',
+        'callback' => function () {
+            return OutputHandler::get_settings();
+        },
+        'permission_callback' => function () {
+            return current_user_can('manage_options');
+        }
+    ]);
+
+    register_rest_route('reactdb/v1', '/output/settings', [
+        'methods'  => 'POST',
+        'callback' => function (WP_REST_Request $request) {
+            $settings = $request->get_param('settings');
+            if (!is_array($settings)) {
+                return new WP_Error('invalid_settings', 'Invalid settings', ['status' => 400]);
+            }
+            OutputHandler::update_settings($settings);
+            return OutputHandler::get_settings();
+        },
+        'permission_callback' => function () {
+            return current_user_can('manage_options');
+        }
+    ]);
+
     // Output API - public access
     register_rest_route('reactdb/v1', '/output/(?P<task>[A-Za-z0-9_-]+)', [
         'methods'  => 'GET',

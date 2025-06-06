@@ -12,7 +12,8 @@ const navItems = [
   { text: 'CSVエクスポート', to: '/export' },
   { text: 'DB登録', to: '/create' },
   { text: 'データベース一覧', to: '/' },
-  { text: '操作ログ', to: '/logs' }
+  { text: '操作ログ', to: '/logs' },
+  { text: '出力設定', to: '/output' }
 ];
 
 const drawerWidth = 240;

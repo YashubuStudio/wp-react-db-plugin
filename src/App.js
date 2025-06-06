@@ -8,6 +8,7 @@ import DatabaseManager from './pages/DatabaseManager';
 import TableCreate from './pages/TableCreate';
 import TableEditor from './pages/TableEditor';
 import Logs from './pages/Logs';
+import OutputSettings from './pages/OutputSettings';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
           <Route path="/import" element={<CSVImport />} />
           <Route path="/export" element={<CSVExport />} />
           <Route path="/logs" element={<Logs />} />
+          <Route path="/output" element={<OutputSettings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
