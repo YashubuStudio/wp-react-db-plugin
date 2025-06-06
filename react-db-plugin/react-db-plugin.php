@@ -15,6 +15,7 @@ defined('ABSPATH') || exit;
 require_once __DIR__ . '/includes/api.php';
 require_once __DIR__ . '/includes/csv-handler.php';
 require_once __DIR__ . '/includes/log-handler.php';
+require_once __DIR__ . '/includes/output-handler.php';
 require_once __DIR__ . '/includes/shortcode.php';
 require_once __DIR__ . '/includes/block.php';
 
