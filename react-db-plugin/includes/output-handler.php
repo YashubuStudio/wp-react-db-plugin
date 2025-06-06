@@ -36,12 +36,20 @@ class OutputHandler {
         if (!$config) {
             return '<div>No settings</div>';
         }
-        if (!empty($config['html'])) {
-            return $config['html'];
-        }
         $rows = self::get_rows($config['table']);
         if (!$rows) {
             return '<div>No data</div>';
+        }
+        if (!empty($config['html'])) {
+            ob_start();
+            foreach ($rows as $row) {
+                $html = $config['html'];
+                foreach ($row as $k => $v) {
+                    $html = str_replace('{{' . $k . '}}', esc_html($v), $html);
+                }
+                echo $html;
+            }
+            return ob_get_clean();
         }
         ob_start();
         echo '<ul class="reactdb-output-list">';
