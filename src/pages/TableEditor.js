@@ -93,16 +93,15 @@ const TableEditor = () => {
             label={col.Field}
             value={data[col.Field] || ''}
             onChange={(e) => handleChange(col.Field, e.target.value)}
-              sx={{ mb: 2, mr: 1 }}
-              InputProps={{ readOnly: isReadonly(col) }}
-            />
-            {col.Field === 'user_id' && userNames[data[col.Field]] && (
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, mr: 2 }}>
-                ({userNames[data[col.Field]]})
-              </Box>
-            )}
-          </React.Fragment>
-        )
+            sx={{ mb: 2, mr: 1 }}
+            InputProps={{ readOnly: isReadonly(col) }}
+          />
+          {col.Field === 'user_id' && userNames[data[col.Field]] && (
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, mr: 2 }}>
+              ({userNames[data[col.Field]]})
+            </Box>
+          )}
+        </React.Fragment>
       ))}
       <Button variant="contained" onClick={handleSave} sx={{ mr: 2 }}>保存</Button>
       {id && <Button color="error" variant="outlined" onClick={handleDelete}>削除</Button>}
