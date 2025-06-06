@@ -24,6 +24,11 @@ const TableEditor = () => {
     return name === 'created_at' || name === 'updated_at';
   };
 
+  const isHidden = (col) => {
+    const name = col.Field.toLowerCase();
+    return name === 'created_at' || name === 'updated_at';
+  };
+
   useEffect(() => {
     if (!table) return;
     if (isPlugin) {
@@ -82,13 +87,12 @@ const TableEditor = () => {
   };
   return (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
-      {columns.map((col) => (
-        col.Field !== 'id' && (
-          <React.Fragment key={col.Field}>
-            <TextField
-              label={col.Field}
-              value={data[col.Field] || ''}
-              onChange={(e) => handleChange(col.Field, e.target.value)}
+      {columns.filter(col => col.Field !== 'id' && !isHidden(col)).map((col) => (
+        <React.Fragment key={col.Field}>
+          <TextField
+            label={col.Field}
+            value={data[col.Field] || ''}
+            onChange={(e) => handleChange(col.Field, e.target.value)}
               sx={{ mb: 2, mr: 1 }}
               InputProps={{ readOnly: isReadonly(col) }}
             />

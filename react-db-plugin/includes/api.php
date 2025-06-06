@@ -291,6 +291,10 @@ add_action('rest_api_init', function () {
             if (!$wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table))) {
                 return new WP_Error('invalid_table', 'Table not found', ['status' => 404]);
             }
+            $columns = $wpdb->get_col("DESC $table", 0);
+            if (in_array('updated_at', $columns, true)) {
+                $data['updated_at'] = current_time('mysql');
+            }
             $wpdb->update($table, $data, ['id' => $id]);
             LogHandler::addLog(get_current_user_id(), 'Update Row', $name);
             return ['status' => 'updated'];
@@ -312,6 +316,13 @@ add_action('rest_api_init', function () {
             $table = $wpdb->prefix . 'reactdb_' . $name;
             if (!$wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table))) {
                 return new WP_Error('invalid_table', 'Table not found', ['status' => 404]);
+            }
+            $columns = $wpdb->get_col("DESC $table", 0);
+            if (in_array('created_at', $columns, true) && empty($data['created_at'])) {
+                $data['created_at'] = current_time('mysql');
+            }
+            if (in_array('updated_at', $columns, true) && empty($data['updated_at'])) {
+                $data['updated_at'] = current_time('mysql');
             }
             $wpdb->insert($table, $data);
             LogHandler::addLog(get_current_user_id(), 'Insert Row', $name);
