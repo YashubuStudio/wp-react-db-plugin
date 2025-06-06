@@ -73,6 +73,13 @@ the task settings.
 - PHP plugin files reside in `react-db-plugin/`.
 - Planned page layouts are described in `設計.txt`.
 
+## Updating Plugin Info
+
+To change the displayed plugin version or author name, edit the following locations:
+
+1. The comment block at the top of `react-db-plugin/react-db-plugin.php` contains fields like `Version:` and `Author:`. Updating these lines changes the information shown in WordPress.
+2. The React application's version number is stored in the `"version"` field of `package.json`. After modifying it, run `npm run build` to copy the new build to `react-db-plugin/assets`.
+
 ## Testing
 
 Run tests with the following command if the environment has the required
