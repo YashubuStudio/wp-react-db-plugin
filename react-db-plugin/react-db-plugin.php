@@ -2,8 +2,8 @@
 /*
 Plugin Name: React DB Plugin
 Description: React-based DB management.
-Version: 1.0
-Author: YourName
+Version: 1.1
+Author: YashubuStudio
 */
 
 defined('ABSPATH') || exit;
