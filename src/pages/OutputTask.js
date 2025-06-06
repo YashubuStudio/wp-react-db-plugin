@@ -6,6 +6,7 @@ import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import isPlugin, { apiNonce } from '../isPlugin';
+import HTMLPreview from '../components/HTMLPreview';
 
 const OutputTask = () => {
   const { task } = useParams();
@@ -89,19 +90,21 @@ const OutputTask = () => {
   };
 
   const endpoint = `/wp-json/reactdb/v1/output/${task}`;
+  const previewData = columns.reduce((acc, col) => ({ ...acc, [col]: col }), {});
 
   return (
     <Box>
       <Typography variant="h5" gutterBottom>タスク設定: {task}</Typography>
-      <Box sx={{ display: 'flex', flexDirection: 'column', maxWidth: 600 }}>
-        <TextField select label="テーブル" value={config.table} onChange={e => setConfig({ ...config, table: e.target.value })} sx={{ mb: 2 }}>
-          <MenuItem value="">選択</MenuItem>
-          {tables.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
-        </TextField>
-        <TextField select label="形式" value={config.format} onChange={e => setConfig({ ...config, format: e.target.value })} sx={{ mb: 2 }}>
-          <MenuItem value="html">HTML</MenuItem>
-          <MenuItem value="json">JSON</MenuItem>
-        </TextField>
+      <Box sx={{ display: 'flex' }}>
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: 600 }}>
+          <TextField select label="テーブル" value={config.table} onChange={e => setConfig({ ...config, table: e.target.value })} sx={{ mb: 2 }}>
+            <MenuItem value="">選択</MenuItem>
+            {tables.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+          </TextField>
+          <TextField select label="形式" value={config.format} onChange={e => setConfig({ ...config, format: e.target.value })} sx={{ mb: 2 }}>
+            <MenuItem value="html">HTML</MenuItem>
+            <MenuItem value="json">JSON</MenuItem>
+          </TextField>
         {config.format === 'html' && columns.length > 0 && (
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
             {columns.map(c => (
@@ -123,6 +126,10 @@ const OutputTask = () => {
           <Box sx={{ mb: 2 }}>エンドポイント: {endpoint}</Box>
         )}
         <Button variant="contained" onClick={handleSave}>保存</Button>
+        </Box>
+        {config.format === 'html' && (
+          <HTMLPreview html={config.html} data={previewData} />
+        )}
       </Box>
     </Box>
   );
