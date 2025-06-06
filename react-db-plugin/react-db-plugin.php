@@ -2,7 +2,7 @@
 /*
 Plugin Name: React DB Plugin
 Description: React-based DB management.
-Version: 1.2
+Version: 1.3
 Author: YashubuStudio
 */
 
@@ -18,6 +18,7 @@ require_once __DIR__ . '/includes/log-handler.php';
 require_once __DIR__ . '/includes/output-handler.php';
 require_once __DIR__ . '/includes/shortcode.php';
 require_once __DIR__ . '/includes/block.php';
+require_once __DIR__ . '/includes/update-checker.php';
 
 register_activation_hook(__FILE__, function() {
     global $wpdb;
