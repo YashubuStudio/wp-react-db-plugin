@@ -36,6 +36,19 @@ CSVのインポートでは最初の100行を解析し、各カラムの値に�
 [reactdb input='DB:"c1",sample']
 ```
 
+## 出力API
+
+プラグインで設定したタスクのデータは REST API から取得できます。
+`/wp-json/reactdb/v1/output/<タスク名>` に GET リクエストを
+送信してください。
+
+```bash
+curl -X GET https://example.com/wp-json/reactdb/v1/output/testAPI-JSON
+```
+
+上記の例では `testAPI-JSON` タスクで定義されたテーブル内容が
+JSON 形式で返されます。
+
 ## 開発メモ
 
 - Reactのソースコードは`src/`に配置されています。
