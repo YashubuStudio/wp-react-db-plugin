@@ -11,9 +11,15 @@ class OutputHandler {
     }
 
     public static function update_settings($settings) {
-        if (is_array($settings)) {
-            update_option('reactdb_output_settings', $settings);
+        if (!is_array($settings)) {
+            return;
         }
+        foreach ($settings as $task => $conf) {
+            if (isset($conf['html'])) {
+                $settings[$task]['html'] = wp_kses_post($conf['html']);
+            }
+        }
+        update_option('reactdb_output_settings', $settings);
     }
 
     public static function get_rows($table) {
@@ -29,6 +35,9 @@ class OutputHandler {
         $config = self::get_task($task);
         if (!$config) {
             return '<div>No settings</div>';
+        }
+        if (!empty($config['html'])) {
+            return $config['html'];
         }
         $rows = self::get_rows($config['table']);
         if (!$rows) {
@@ -48,9 +57,8 @@ class OutputHandler {
         if (!$config) {
             return new WP_Error('not_found', 'Task not found', ['status' => 404]);
         }
-        $rows = self::get_rows($config['table']);
         if ($config['format'] === 'json') {
-            return $rows;
+            return self::get_rows($config['table']);
         }
         return ['html' => self::render_html($task)];
     }

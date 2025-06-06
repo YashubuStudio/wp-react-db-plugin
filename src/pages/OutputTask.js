@@ -1,17 +1,16 @@
 import React, { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { Link } from 'react-router-dom';
 import isPlugin, { apiNonce } from '../isPlugin';
 
-const OutputSettings = () => {
+const OutputTask = () => {
+  const { task } = useParams();
   const [settings, setSettings] = useState({});
-  const [task, setTask] = useState('');
-  const [table, setTable] = useState('');
-  const [format, setFormat] = useState('html');
+  const [config, setConfig] = useState({ table: '', format: 'html', html: '' });
   const [tables, setTables] = useState([]);
 
   useEffect(() => {
@@ -21,7 +20,15 @@ const OutputSettings = () => {
         headers: { 'X-WP-Nonce': apiNonce }
       })
         .then(r => r.json())
-        .then(data => setSettings(data));
+        .then(data => {
+          setSettings(data);
+          const c = data[task] || {};
+          setConfig({
+            table: c.table || '',
+            format: c.format || 'html',
+            html: c.html || ''
+          });
+        });
       fetch('/wp-json/reactdb/v1/tables', {
         credentials: 'include',
         headers: { 'X-WP-Nonce': apiNonce }
@@ -31,11 +38,11 @@ const OutputSettings = () => {
     } else {
       setTables(['demo_table']);
     }
-  }, []);
+  }, [task]);
 
   const handleSave = () => {
-    if (!task || !table) return;
-    const newSettings = { ...settings, [task]: { table, format, html: '' } };
+    if (!task || !config.table) return;
+    const newSettings = { ...settings, [task]: config };
     if (isPlugin) {
       fetch('/wp-json/reactdb/v1/output/settings', {
         method: 'POST',
@@ -44,39 +51,38 @@ const OutputSettings = () => {
         body: JSON.stringify({ settings: newSettings })
       })
         .then(r => r.json())
-        .then(data => setSettings(data));
+        .then(data => {
+          setSettings(data);
+        });
     } else {
       setSettings(newSettings);
     }
-    setTask('');
   };
+
+  const endpoint = `/wp-json/reactdb/v1/output/${task}`;
 
   return (
     <Box>
-      <Typography variant="h5" gutterBottom>出力設定</Typography>
-      <Box sx={{ display: 'flex', mb: 2 }}>
-        <TextField label="タスク名" value={task} onChange={e => setTask(e.target.value)} sx={{ mr: 1 }} />
-        <TextField select label="テーブル" value={table} onChange={e => setTable(e.target.value)} sx={{ mr: 1 }}>
+      <Typography variant="h5" gutterBottom>タスク設定: {task}</Typography>
+      <Box sx={{ display: 'flex', flexDirection: 'column', maxWidth: 600 }}>
+        <TextField select label="テーブル" value={config.table} onChange={e => setConfig({ ...config, table: e.target.value })} sx={{ mb: 2 }}>
           <MenuItem value="">選択</MenuItem>
           {tables.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
         </TextField>
-        <TextField select label="形式" value={format} onChange={e => setFormat(e.target.value)} sx={{ mr: 1 }}>
+        <TextField select label="形式" value={config.format} onChange={e => setConfig({ ...config, format: e.target.value })} sx={{ mb: 2 }}>
           <MenuItem value="html">HTML</MenuItem>
           <MenuItem value="json">JSON</MenuItem>
         </TextField>
+        {config.format === 'html' && (
+          <TextField label="HTML" multiline minRows={4} value={config.html} onChange={e => setConfig({ ...config, html: e.target.value })} sx={{ mb: 2 }} />
+        )}
+        {config.format === 'json' && (
+          <Box sx={{ mb: 2 }}>エンドポイント: {endpoint}</Box>
+        )}
         <Button variant="contained" onClick={handleSave}>保存</Button>
-      </Box>
-      <Box>
-        {Object.keys(settings).length === 0 && <div>設定なし</div>}
-        {Object.entries(settings).map(([name, conf]) => (
-          <Box key={name}>
-            <Link to={`/output/${name}`}>{name}</Link>: {conf.table} ({conf.format})
-          </Box>
-        ))}
       </Box>
     </Box>
   );
 };
 
-export default OutputSettings;
-
+export default OutputTask;
