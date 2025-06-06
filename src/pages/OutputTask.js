@@ -102,7 +102,7 @@ const OutputTask = () => {
           <MenuItem value="html">HTML</MenuItem>
           <MenuItem value="json">JSON</MenuItem>
         </TextField>
-        {columns.length > 0 && (
+        {config.format === 'html' && columns.length > 0 && (
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
             {columns.map(c => (
               <Box key={c} sx={{ px: 1, py: 0.5, border: '1px solid', borderColor: 'grey.400', borderRadius: 1 }}>
@@ -115,12 +115,14 @@ const OutputTask = () => {
           <TextField label="HTML" multiline minRows={4} value={config.html} onChange={e => setConfig({ ...config, html: e.target.value })} sx={{ mb: 2 }} />
         )}
         {config.format === 'json' && (
-          <Box sx={{ mb: 2 }}>エンドポイント: {endpoint}</Box>
+          <>
+            <Box sx={{ mb: 2 }}>エンドポイント: {endpoint}</Box>
+            <Typography variant="body1" sx={{ mb: 2, fontSize: '1rem' }}>
+              ショートコード: [reactdb_output task="{task}"]
+            </Typography>
+          </>
         )}
         <Button variant="contained" onClick={handleSave}>保存</Button>
-        <Typography variant="body1" sx={{ mt: 2, fontSize: '1rem' }}>
-          ショートコード: [reactdb_output task="{task}"]
-        </Typography>
       </Box>
     </Box>
   );
