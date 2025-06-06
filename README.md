@@ -54,6 +54,19 @@ database table. Both accept an `input` attribute formatted as
 [reactdb input='DB:"c1",sample']
 ```
 
+## Output API
+
+Data configured with the plugin can be fetched directly via a REST
+endpoint. Send a GET request to `/wp-json/reactdb/v1/output/<task>`
+where `<task>` is the name of the output definition.
+
+```bash
+curl -X GET https://example.com/wp-json/reactdb/v1/output/testAPI-JSON
+```
+
+The endpoint returns a JSON array of rows or an HTML snippet depending on
+the task settings.
+
 ## Development Notes
 
 - React source files live under `src/`.
