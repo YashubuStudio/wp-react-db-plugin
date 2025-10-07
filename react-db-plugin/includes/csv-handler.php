@@ -146,10 +146,13 @@ class CSVHandler {
         $skipMinimumBreaks = 0;
         $pendingRecovery = false;
         $firstColumnPattern = null;
+
+        $expectedColumns = null;
         $isFirstRow = true;
         $currentLine = 1;
         $rowStartLine = 1;
         $rawBuffer = '';
+
 
         for ($i = 0; $i < $length; $i++) {
             $char = $contents[$i];
@@ -197,13 +200,8 @@ class CSVHandler {
                         $currentField = '';
                         $inQuotes = true;
                     } else {
-                        $errors[] = self::build_parse_error($rowStartLine, $rawBuffer, 'unexpected_quote');
-                        $skippingRow = true;
-                        $skipMinimumBreaks = 1;
-                        $currentRow = [];
-                        $currentField = '';
-                        $rawBuffer = '';
-                        $inQuotes = false;
+
+                        $currentField .= '"';
                     }
                 }
                 continue;
@@ -234,6 +232,18 @@ class CSVHandler {
                     continue;
                 }
 
+                $proposedCount = count($currentRow) + 1;
+                if ($expectedColumns !== null && $proposedCount < $expectedColumns && !$isFirstRow) {
+                    $lookahead = substr($contents, $i + 1, 400);
+                    $looksLikeNextRow = self::looks_like_new_row($lookahead, $delimiter);
+                    $matchesPattern = self::lookahead_matches_first_column_pattern($lookahead, $firstColumnPattern, $delimiter);
+                    if (!$looksLikeNextRow || !$matchesPattern) {
+                        $currentField .= "\n";
+                        $currentLine++;
+                        continue;
+                    }
+                }
+
                 self::finalize_field($currentRow, $currentField);
 
                 if ($pendingRecovery) {
@@ -251,8 +261,12 @@ class CSVHandler {
                     } elseif (!$skipEmpty || self::row_has_value($currentRow)) {
                         $rows[] = $currentRow;
                         if ($isFirstRow) {
+                            $expectedColumns = count($currentRow);
                             $isFirstRow = false;
                         } elseif (!empty($currentRow)) {
+                            if ($expectedColumns === null) {
+                                $expectedColumns = count($currentRow);
+                            }
                             self::update_first_column_pattern($firstColumnPattern, $currentRow[0]);
                         }
                     }
@@ -260,8 +274,12 @@ class CSVHandler {
                 } elseif (!$skipEmpty || self::row_has_value($currentRow)) {
                     $rows[] = $currentRow;
                     if ($isFirstRow) {
+                        $expectedColumns = count($currentRow);
                         $isFirstRow = false;
                     } elseif (!empty($currentRow)) {
+                        if ($expectedColumns === null) {
+                            $expectedColumns = count($currentRow);
+                        }
                         self::update_first_column_pattern($firstColumnPattern, $currentRow[0]);
                     }
                 }
@@ -272,6 +290,7 @@ class CSVHandler {
                 $currentLine++;
                 continue;
             }
+
 
             if (!$inQuotes && ($char === ' ' || $char === "\t")) {
                 if ($currentField === '') {
@@ -302,8 +321,12 @@ class CSVHandler {
                     } elseif (!$skipEmpty || self::row_has_value($currentRow)) {
                         $rows[] = $currentRow;
                         if ($isFirstRow) {
+                            $expectedColumns = count($currentRow);
                             $isFirstRow = false;
                         } elseif (!empty($currentRow)) {
+                            if ($expectedColumns === null) {
+                                $expectedColumns = count($currentRow);
+                            }
                             self::update_first_column_pattern($firstColumnPattern, $currentRow[0]);
                         }
                     }
@@ -311,8 +334,13 @@ class CSVHandler {
                 } elseif (!$skipEmpty || self::row_has_value($currentRow)) {
                     $rows[] = $currentRow;
                     if ($isFirstRow) {
+
+                        $expectedColumns = count($currentRow);
                         $isFirstRow = false;
                     } elseif (!empty($currentRow)) {
+                        if ($expectedColumns === null) {
+                            $expectedColumns = count($currentRow);
+                        }
                         self::update_first_column_pattern($firstColumnPattern, $currentRow[0]);
                     }
                 }
@@ -382,6 +410,37 @@ class CSVHandler {
                 }
             }
             return false;
+        }
+
+        return true;
+    }
+
+    private static function lookahead_matches_first_column_pattern($snippet, $pattern, $delimiter) {
+        if ($pattern === null) {
+            return true;
+        }
+
+        $snippet = ltrim($snippet, "\r\n");
+        if ($snippet === '') {
+            return false;
+        }
+
+        $newlinePos = strpos($snippet, "\n");
+        if ($newlinePos !== false) {
+            $snippet = substr($snippet, 0, $newlinePos);
+        }
+
+        $trimmed = ltrim($snippet);
+        if ($trimmed === '') {
+            return false;
+        }
+
+        if ($pattern === 'numeric') {
+            $delimPos = strpos($trimmed, $delimiter);
+            if ($delimPos !== false) {
+                $trimmed = substr($trimmed, 0, $delimPos);
+            }
+            return self::value_is_numeric_like($trimmed);
         }
 
         return true;
