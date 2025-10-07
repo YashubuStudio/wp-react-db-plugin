@@ -384,7 +384,8 @@ class CSVHandler {
             return false;
         }
 
-        if (strpos($trimmed, $delimiter) === false) {
+        $delimiterPos = strpos($trimmed, $delimiter);
+        if ($delimiterPos === false) {
             return false;
         }
 
@@ -409,6 +410,11 @@ class CSVHandler {
                     }
                 }
             }
+            return false;
+        }
+
+        $firstField = substr($trimmed, 0, $delimiterPos);
+        if (substr_count($firstField, '"') % 2 !== 0) {
             return false;
         }
 
