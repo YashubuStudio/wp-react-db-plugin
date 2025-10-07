@@ -24,7 +24,35 @@ const normalizeOverride = (value) => {
   }
 };
 
-const isValidOverride = (value) => /^[A-Za-z0-9_-]+$/.test(value);
+const isValidOverride = (value) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(value);
+
+const overrideReasonMessage = (reason) => {
+  switch (reason) {
+    case 'non_latin':
+      return '日本語などの全角文字が含まれているため、そのままでは使用できません。';
+    case 'invalid_start':
+      return '数字などの文字で始まっているため、そのままでは使用できません。';
+    case 'invalid_override':
+      return '指定した代替名に使用できない文字が含まれています。別の名前を指定してください。';
+    case 'duplicate':
+      return '同じ名前が複数の列に割り当てられています。別の名前を指定してください。';
+    default:
+      return '半角英数字とアンダースコア（_）のみ使用できます。アルファベットで始めてください。';
+  }
+};
+
+const parseErrorReasonMessage = (reason) => {
+  switch (reason) {
+    case 'unexpected_quote':
+      return 'フィールド内に不正な引用符が含まれているため、この行を解析できませんでした。';
+    case 'unterminated_quote':
+      return '閉じられていない引用符が検出されたため、この行を解析できませんでした。';
+    case 'dangling_row':
+      return '直前のエラーで分割された行の続きと判断されたため、この行をスキップしました。';
+    default:
+      return 'この行はCSVとして解析できなかったためスキップしました。';
+  }
+};
 
 const CSVImport = () => {
   const [file, setFile] = useState(null);
@@ -87,14 +115,24 @@ const CSVImport = () => {
 
       if (!response.ok) {
         if (data?.code === 'column_override_required' && data?.data?.columns) {
-          setPendingColumns(data.data.columns);
+          const columns = data.data.columns.map((col) => ({
+            ...col,
+            suggested: typeof col.suggested === 'string' ? col.suggested : '',
+          }));
+          setPendingColumns(columns);
           const initial = {};
-          data.data.columns.forEach((col) => {
-            initial[col.index] = overridePayload && overridePayload[col.index] ? overridePayload[col.index] : '';
+          columns.forEach((col) => {
+            if (overridePayload && overridePayload[col.index]) {
+              initial[col.index] = overridePayload[col.index];
+            } else if (col.suggested) {
+              initial[col.index] = col.suggested;
+            } else {
+              initial[col.index] = '';
+            }
           });
           setOverrides(initial);
           setLogSeverity('warning');
-          setLog('列名に日本語が含まれているため、半角英数字の代替名を入力してください。');
+          setLog('一部の列名がそのままでは使用できません。半角英数字とアンダースコアのみで代替名を入力してください。');
           return;
         }
         const message = data?.message || 'インポートに失敗しました。';
@@ -206,6 +244,18 @@ const CSVImport = () => {
     [preview]
   );
 
+  const parseErrorCount = useMemo(() => {
+    if (!preview || typeof preview.parse_error_count !== 'number') {
+      return 0;
+    }
+    return preview.parse_error_count;
+  }, [preview]);
+
+  const parseErrors = useMemo(
+    () => (preview && Array.isArray(preview.parse_errors) ? preview.parse_errors : []),
+    [preview]
+  );
+
   return (
     <Box>
       <Typography variant="h5" gutterBottom>
@@ -233,17 +283,14 @@ const CSVImport = () => {
           <Stack spacing={2}>
             <Typography variant="h6">代替のカラム名を入力</Typography>
             <Typography>
-              以下の列は日本語または重複した名前のため、そのままでは登録できません。半角英数字とアンダースコア、ハイフンのみで入力してください。
+              以下の列はそのままでは使用できません。半角英数字とアンダースコアのみで、アルファベットから始まる名前を指定してください。
             </Typography>
             <Divider />
             {pendingColumns.map((col) => {
               const value = overrides[col.index] || '';
               const trimmed = value.trim();
               const isError = !trimmed || !isValidOverride(trimmed);
-              const helperText =
-                col.reason === 'duplicate'
-                  ? '同じ名前が複数の列に割り当てられています。別の名前を指定してください。'
-                  : '半角英数字とアンダースコア（_）、ハイフン（-）のみ使用できます。';
+              const helperText = overrideReasonMessage(col.reason);
               return (
                 <TextField
                   key={col.index}
@@ -300,6 +347,11 @@ const CSVImport = () => {
                   <Typography variant="body2">
                     {`一部の行 (${failedRowsLabel}件) はデータベースに保存できなかったためスキップしました。`}
                   </Typography>
+                  {preview.failure_reason && (
+                    <Typography variant="body2" color="text.secondary">
+                      {`エラーの詳細: ${preview.failure_reason}`}
+                    </Typography>
+                  )}
                   {failedSamples.length > 0 && (
                     <Box
                       sx={{
@@ -313,6 +365,57 @@ const CSVImport = () => {
                       <Typography component="pre" variant="caption" sx={{ m: 0, whiteSpace: 'pre-wrap' }}>
                         {JSON.stringify(failedSamples, null, 2)}
                       </Typography>
+                    </Box>
+                  )}
+                </Stack>
+              </Alert>
+            )}
+
+            {parseErrorCount > 0 && (
+              <Alert severity="warning">
+                <Stack spacing={1}>
+                  <Typography variant="body2">
+                    {`CSVの一部の行 (${parseErrorCount}件) は解析できなかったためスキップしました。`}
+                  </Typography>
+                  {parseErrors.length > 0 && (
+                    <Box
+                      sx={{
+                        maxHeight: 220,
+                        overflow: 'auto',
+                        p: 1,
+                        bgcolor: (theme) => theme.palette.action.hover,
+                        borderRadius: 1,
+                      }}
+                    >
+                      <Stack spacing={1}>
+                        {parseErrors.map((error, index) => {
+                          const key = `${error?.line ?? 'unknown'}-${index}`;
+                          const line = typeof error?.line === 'number' ? error.line : '不明';
+                          const sample = typeof error?.sample === 'string' ? error.sample : '';
+                          return (
+                            <Box key={key} sx={{ borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>
+                              <Typography variant="caption" sx={{ display: 'block', fontWeight: 600 }}>
+                                {`行 ${line}: ${parseErrorReasonMessage(error?.reason)}`}
+                              </Typography>
+                              {sample && (
+                                <Typography
+                                  component="pre"
+                                  variant="caption"
+                                  sx={{
+                                    m: 0,
+                                    whiteSpace: 'pre-wrap',
+                                    bgcolor: (theme) => theme.palette.background.paper,
+                                    borderRadius: 0.5,
+                                    p: 1,
+                                  }}
+                                >
+                                  {sample}
+                                </Typography>
+                              )}
+                            </Box>
+                          );
+                        })}
+                      </Stack>
                     </Box>
                   )}
                 </Stack>
