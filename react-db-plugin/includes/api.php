@@ -145,7 +145,8 @@ add_action('rest_api_init', function () {
             $parsed = CSVHandler::parseCSV($uploaded['tmp_name'], [
                 'skip_empty' => false,
             ]);
-            $rows = $parsed['rows'];
+            $rows = isset($parsed['rows']) && is_array($parsed['rows']) ? $parsed['rows'] : [];
+            $parseErrors = isset($parsed['errors']) && is_array($parsed['errors']) ? array_values($parsed['errors']) : [];
 
             $rows = array_values(array_filter($rows, function ($row) {
                 if (!is_array($row)) {
@@ -436,6 +437,7 @@ add_action('rest_api_init', function () {
             LogHandler::addLog(get_current_user_id(), 'Import Table', $name);
 
             $previewRows = array_slice($preparedRows, 0, 20);
+            $sourceRowCount = count($normalizedRows);
 
             return [
                 'status'   => 'imported',
@@ -444,12 +446,14 @@ add_action('rest_api_init', function () {
                     'columns'    => $headerMeta,
                     'rows'       => $previewRows,
                     'total_rows' => count($preparedRows),
-                    'source_rows'=> count($normalizedRows),
+                    'source_rows'=> $sourceRowCount,
                     'delimiter'  => $parsed['delimiter'],
                     'encoding'   => $parsed['encoding'],
                     'failed_rows'=> $failedRows,
                     'failure_reason' => $lastInsertError !== '' ? $lastInsertError : null,
                     'failed_samples' => $failedSamples,
+                    'parse_error_count' => count($parseErrors),
+                    'parse_errors'      => $parseErrors,
                 ],
             ];
         },

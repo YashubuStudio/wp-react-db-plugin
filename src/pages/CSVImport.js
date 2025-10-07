@@ -41,6 +41,19 @@ const overrideReasonMessage = (reason) => {
   }
 };
 
+const parseErrorReasonMessage = (reason) => {
+  switch (reason) {
+    case 'unexpected_quote':
+      return 'フィールド内に不正な引用符が含まれているため、この行を解析できませんでした。';
+    case 'unterminated_quote':
+      return '閉じられていない引用符が検出されたため、この行を解析できませんでした。';
+    case 'dangling_row':
+      return '直前のエラーで分割された行の続きと判断されたため、この行をスキップしました。';
+    default:
+      return 'この行はCSVとして解析できなかったためスキップしました。';
+  }
+};
+
 const CSVImport = () => {
   const [file, setFile] = useState(null);
   const [table, setTable] = useState('');
@@ -231,6 +244,18 @@ const CSVImport = () => {
     [preview]
   );
 
+  const parseErrorCount = useMemo(() => {
+    if (!preview || typeof preview.parse_error_count !== 'number') {
+      return 0;
+    }
+    return preview.parse_error_count;
+  }, [preview]);
+
+  const parseErrors = useMemo(
+    () => (preview && Array.isArray(preview.parse_errors) ? preview.parse_errors : []),
+    [preview]
+  );
+
   return (
     <Box>
       <Typography variant="h5" gutterBottom>
@@ -340,6 +365,57 @@ const CSVImport = () => {
                       <Typography component="pre" variant="caption" sx={{ m: 0, whiteSpace: 'pre-wrap' }}>
                         {JSON.stringify(failedSamples, null, 2)}
                       </Typography>
+                    </Box>
+                  )}
+                </Stack>
+              </Alert>
+            )}
+
+            {parseErrorCount > 0 && (
+              <Alert severity="warning">
+                <Stack spacing={1}>
+                  <Typography variant="body2">
+                    {`CSVの一部の行 (${parseErrorCount}件) は解析できなかったためスキップしました。`}
+                  </Typography>
+                  {parseErrors.length > 0 && (
+                    <Box
+                      sx={{
+                        maxHeight: 220,
+                        overflow: 'auto',
+                        p: 1,
+                        bgcolor: (theme) => theme.palette.action.hover,
+                        borderRadius: 1,
+                      }}
+                    >
+                      <Stack spacing={1}>
+                        {parseErrors.map((error, index) => {
+                          const key = `${error?.line ?? 'unknown'}-${index}`;
+                          const line = typeof error?.line === 'number' ? error.line : '不明';
+                          const sample = typeof error?.sample === 'string' ? error.sample : '';
+                          return (
+                            <Box key={key} sx={{ borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>
+                              <Typography variant="caption" sx={{ display: 'block', fontWeight: 600 }}>
+                                {`行 ${line}: ${parseErrorReasonMessage(error?.reason)}`}
+                              </Typography>
+                              {sample && (
+                                <Typography
+                                  component="pre"
+                                  variant="caption"
+                                  sx={{
+                                    m: 0,
+                                    whiteSpace: 'pre-wrap',
+                                    bgcolor: (theme) => theme.palette.background.paper,
+                                    borderRadius: 0.5,
+                                    p: 1,
+                                  }}
+                                >
+                                  {sample}
+                                </Typography>
+                              )}
+                            </Box>
+                          );
+                        })}
+                      </Stack>
                     </Box>
                   )}
                 </Stack>
