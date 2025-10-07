@@ -146,11 +146,13 @@ class CSVHandler {
         $skipMinimumBreaks = 0;
         $pendingRecovery = false;
         $firstColumnPattern = null;
+
         $expectedColumns = null;
         $isFirstRow = true;
         $currentLine = 1;
         $rowStartLine = 1;
         $rawBuffer = '';
+
 
         for ($i = 0; $i < $length; $i++) {
             $char = $contents[$i];
@@ -198,6 +200,7 @@ class CSVHandler {
                         $currentField = '';
                         $inQuotes = true;
                     } else {
+
                         $currentField .= '"';
                     }
                 }
@@ -288,6 +291,7 @@ class CSVHandler {
                 continue;
             }
 
+
             if (!$inQuotes && ($char === ' ' || $char === "\t")) {
                 if ($currentField === '') {
                     continue;
@@ -330,6 +334,7 @@ class CSVHandler {
                 } elseif (!$skipEmpty || self::row_has_value($currentRow)) {
                     $rows[] = $currentRow;
                     if ($isFirstRow) {
+
                         $expectedColumns = count($currentRow);
                         $isFirstRow = false;
                     } elseif (!empty($currentRow)) {
