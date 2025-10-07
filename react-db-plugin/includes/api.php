@@ -142,14 +142,76 @@ add_action('rest_api_init', function () {
                 return new WP_Error('table_exists', 'Table already exists', ['status' => 409]);
             }
 
-            $rows = CSVHandler::readCSV($uploaded['tmp_name']);
+            $parsed = CSVHandler::parseCSV($uploaded['tmp_name'], [
+                'skip_empty' => false,
+            ]);
+            $rows = $parsed['rows'];
+
+            $rows = array_values(array_filter($rows, function ($row) {
+                if (!is_array($row)) {
+                    return false;
+                }
+                foreach ($row as $value) {
+                    if ($value !== '' && $value !== null) {
+                        return true;
+                    }
+                }
+                return false;
+            }));
+
             if (!$rows || count($rows) < 1) {
                 return new WP_Error('invalid_csv', 'CSV is empty', ['status' => 400]);
             }
 
             $raw_header = array_shift($rows);
-            if (!$raw_header) {
+            while ($raw_header !== null && is_array($raw_header)) {
+                $nonEmpty = array_filter($raw_header, function ($value) {
+                    return $value !== '' && $value !== null;
+                });
+                if (!empty($nonEmpty)) {
+                    break;
+                }
+                $raw_header = array_shift($rows);
+            }
+
+            if ($raw_header === null) {
                 return new WP_Error('invalid_csv', 'CSV header missing', ['status' => 400]);
+            }
+
+            $likelyHeader = false;
+            foreach ((array) $raw_header as $value) {
+                $value = is_string($value) ? trim($value) : '';
+                if ($value === '') {
+                    continue;
+                }
+                if (preg_match('/\pL/u', $value)) {
+                    $likelyHeader = true;
+                    break;
+                }
+                if (!is_numeric($value)) {
+                    $likelyHeader = true;
+                    break;
+                }
+            }
+
+            if (!$likelyHeader) {
+                array_unshift($rows, $raw_header);
+                $raw_header = [];
+            }
+
+            $maxColumns = count($raw_header);
+            foreach ($rows as $row) {
+                if (is_array($row)) {
+                    $maxColumns = max($maxColumns, count($row));
+                }
+            }
+
+            if ($maxColumns < 1) {
+                return new WP_Error('invalid_csv', 'CSV data could not be parsed', ['status' => 400]);
+            }
+
+            if (count($raw_header) < $maxColumns) {
+                $raw_header = array_pad($raw_header, $maxColumns, '');
             }
 
             $overrides_raw = $request->get_param('column_overrides');
@@ -166,57 +228,98 @@ add_action('rest_api_init', function () {
                             continue;
                         }
                         $sanitized = sanitize_key($value);
+                        if ($sanitized === '') {
+                            continue;
+                        }
                         $overrides[(int) $idx] = $sanitized;
                     }
                 }
             }
 
-            $header = [];
+            $headerKeys = [];
+            $headerMeta = [];
             $used_keys = [];
-            $conflicts = [];
-            foreach ($raw_header as $idx => $label) {
-                $label = is_string($label) ? trim($label) : '';
-                $candidate = sanitize_key($label);
-                if (array_key_exists((int) $idx, $overrides)) {
-                    $candidate = $overrides[(int) $idx];
+            foreach (range(0, $maxColumns - 1) as $idx) {
+                $label = isset($raw_header[$idx]) ? trim((string) $raw_header[$idx]) : '';
+                $candidate = '';
+
+                if (array_key_exists($idx, $overrides)) {
+                    $candidate = $overrides[$idx];
                 }
-                if ($candidate === '' || isset($used_keys[$candidate])) {
-                    $conflicts[] = [
-                        'index'    => (int) $idx,
-                        'original' => $label,
-                        'reason'   => $candidate === '' ? 'invalid' : 'duplicate',
-                    ];
+
+                if ($candidate === '') {
+                    $candidate = sanitize_key($label);
+                }
+
+                if ($candidate === '' && $label !== '' && function_exists('remove_accents')) {
+                    $normalized = remove_accents($label);
+                    $candidate  = sanitize_key($normalized);
+                }
+
+                if ($candidate === '') {
+                    $candidate = 'column_' . ($idx + 1);
+                }
+
+                $maxLen = 64;
+                $baseCandidate = $candidate;
+                if (strlen($baseCandidate) > $maxLen) {
+                    $baseCandidate = substr($baseCandidate, 0, $maxLen);
+                }
+
+                $unique = $baseCandidate;
+                $suffix = 2;
+                while (isset($used_keys[$unique])) {
+                    $suffix_str = '_' . $suffix;
+                    $available = $maxLen - strlen($suffix_str);
+                    if ($available < 1) {
+                        $available = $maxLen;
+                    }
+                    $unique = substr($baseCandidate, 0, $available) . $suffix_str;
+                    $unique = substr($unique, 0, $maxLen);
+                    $suffix++;
+                }
+                $used_keys[$unique] = true;
+
+                $headerKeys[$idx] = $unique;
+                $headerMeta[] = [
+                    'key'             => $unique,
+                    'label'           => $label !== '' ? $label : $unique,
+                    'original'        => $label,
+                    'auto_generated'  => ($label === ''),
+                    'override_used'   => array_key_exists($idx, $overrides),
+                    'sanitized_value' => $unique,
+                ];
+            }
+
+            $normalizedRows = [];
+            foreach ($rows as $row) {
+                if (!is_array($row)) {
                     continue;
                 }
-                $used_keys[$candidate] = true;
-                $header[(int) $idx] = $candidate;
+                $row = array_values($row);
+                if (count($row) < $maxColumns) {
+                    $row = array_pad($row, $maxColumns, '');
+                } elseif (count($row) > $maxColumns) {
+                    $row = array_slice($row, 0, $maxColumns);
+                }
+                $nonEmpty = array_filter($row, function ($value) {
+                    return $value !== '' && $value !== null;
+                });
+                if (empty($nonEmpty)) {
+                    continue;
+                }
+                $normalizedRows[] = $row;
             }
 
-            if (!empty($conflicts)) {
-                return new WP_Error(
-                    'column_override_required',
-                    '列名に日本語などが含まれているため、半角英数字の代替名が必要です。',
-                    [
-                        'status'  => 422,
-                        'columns' => array_map(function ($col) {
-                            return [
-                                'index'    => $col['index'],
-                                'original' => $col['original'],
-                                'reason'   => $col['reason'],
-                            ];
-                        }, $conflicts),
-                    ]
-                );
+            if (empty($normalizedRows)) {
+                return new WP_Error('invalid_csv', 'CSV rows missing', ['status' => 400]);
             }
-
-            ksort($header);
-            $header = array_values($header);
 
             $charset_collate = $wpdb->get_charset_collate();
 
-            $sample = array_slice($rows, 0, 100);
+            $sample = array_slice($normalizedRows, 0, 100);
             $types = [];
-            foreach ($header as $idx => $col) {
+            foreach ($headerKeys as $idx => $columnKey) {
                 $values = array_column($sample, $idx);
                 $values = array_filter($values, function($v){ return $v !== '' && $v !== null; });
                 $type = 'TEXT';
@@ -226,10 +329,11 @@ add_action('rest_api_init', function () {
                     $is_date = true;
                     $max_len = 0;
                     foreach ($values as $v) {
-                        $max_len = max($max_len, strlen($v));
-                        if (!preg_match('/^-?\d+$/', $v)) { $is_int = false; }
+                        $v = is_string($v) ? trim($v) : $v;
+                        $max_len = max($max_len, is_string($v) ? strlen($v) : strlen((string) $v));
+                        if (!preg_match('/^-?\d+$/', (string) $v)) { $is_int = false; }
                         if (!is_numeric($v)) { $is_float = false; }
-                        if (strtotime($v) === false) { $is_date = false; }
+                        if (strtotime((string) $v) === false) { $is_date = false; }
                     }
                     if ($is_int) {
                         $type = 'BIGINT';
@@ -239,14 +343,18 @@ add_action('rest_api_init', function () {
                         $type = 'DATETIME';
                     } elseif ($max_len <= 255) {
                         $type = 'VARCHAR(255)';
+                    } elseif ($max_len <= 65535) {
+                        $type = 'TEXT';
+                    } else {
+                        $type = 'LONGTEXT';
                     }
                 }
                 $types[$idx] = $type;
             }
 
             $cols = ['id bigint(20) unsigned NOT NULL AUTO_INCREMENT'];
-            foreach ($header as $idx => $h) {
-                $cols[] = "$h {$types[$idx]}";
+            foreach ($headerKeys as $idx => $columnKey) {
+                $cols[] = "$columnKey {$types[$idx]}";
             }
             $cols[] = 'PRIMARY KEY  (id)';
 
@@ -254,17 +362,43 @@ add_action('rest_api_init', function () {
             require_once ABSPATH . 'wp-admin/includes/upgrade.php';
             dbDelta($sql);
 
-            foreach ($rows as $r) {
-                $data = array();
-                foreach ($header as $idx => $col) {
-                    $data[$col] = isset($r[$idx]) ? $r[$idx] : '';
+            $preparedRows = [];
+            $failedRows = 0;
+            $failedSamples = [];
+            foreach ($normalizedRows as $row) {
+                $data = [];
+                foreach ($headerKeys as $idx => $columnKey) {
+                    $data[$columnKey] = isset($row[$idx]) ? $row[$idx] : '';
                 }
-                $wpdb->insert($table, $data);
+                $inserted = $wpdb->insert($table, $data);
+                if ($inserted === false) {
+                    $failedRows++;
+                    if (count($failedSamples) < 5) {
+                        $failedSamples[] = $data;
+                    }
+                    continue;
+                }
+                $preparedRows[] = $data;
             }
 
             LogHandler::addLog(get_current_user_id(), 'Import Table', $name);
 
-            return ['status' => 'imported', 'table' => $name];
+            $previewRows = array_slice($preparedRows, 0, 20);
+
+            return [
+                'status'   => 'imported',
+                'table'    => $name,
+                'preview'  => [
+                    'columns'    => $headerMeta,
+                    'rows'       => $previewRows,
+                    'total_rows' => count($preparedRows),
+                    'source_rows'=> count($normalizedRows),
+                    'delimiter'  => $parsed['delimiter'],
+                    'encoding'   => $parsed['encoding'],
+                    'failed_rows'=> $failedRows,
+                    'failed_samples' => $failedSamples,
+                ],
+            ];
         },
         'permission_callback' => function () {
             return current_user_can('manage_options');
