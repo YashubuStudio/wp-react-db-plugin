@@ -13,7 +13,12 @@ class CSVHandler {
      *
      * @param string $filepath
      * @param array  $args
-     * @return array{rows: array<int, array<int, string>>, delimiter: string|null, encoding: string|null}
+     * @return array{
+     *     rows: array<int, array<int, string>>,
+     *     delimiter: string|null,
+     *     encoding: string|null,
+     *     errors: array<int, array<string, mixed>>,
+     * }
      */
     public static function parseCSV($filepath, $args = []) {
         $defaults = [
@@ -30,6 +35,7 @@ class CSVHandler {
                 'rows'      => [],
                 'delimiter' => null,
                 'encoding'  => null,
+                'errors'    => [],
             ];
         }
 
@@ -39,6 +45,7 @@ class CSVHandler {
                 'rows'      => [],
                 'delimiter' => null,
                 'encoding'  => null,
+                'errors'    => [],
             ];
         }
 
@@ -67,6 +74,33 @@ class CSVHandler {
         $contents = preg_replace("/\r\n?|\n/", "\n", $contents);
 
         $lines = preg_split("/\n/", $contents);
+        $delimiter = self::detect_delimiter_from_lines($lines);
+
+        $parsedRows = self::parse_rows_with_recovery($contents, $delimiter, $args['skip_empty']);
+
+        return [
+            'rows'      => $parsedRows['rows'],
+            'delimiter' => $delimiter,
+            'encoding'  => $encoding,
+            'errors'    => $parsedRows['errors'],
+        ];
+    }
+
+    public static function writeCSV($filepath, $data) {
+        $handle = fopen($filepath, 'w');
+        foreach ($data as $row) {
+            fputcsv($handle, $row);
+        }
+        fclose($handle);
+        return true;
+    }
+    /**
+     * Detect the most likely delimiter from an array of lines.
+     *
+     * @param array<int, string> $lines
+     * @return string
+     */
+    private static function detect_delimiter_from_lines($lines) {
         $sampleLine = '';
         foreach ($lines as $line) {
             if (trim($line) === '') {
@@ -89,57 +123,326 @@ class CSVHandler {
             }
         }
 
-        $temp = fopen('php://temp', 'r+');
-        fwrite($temp, implode("\n", $lines));
-        fwrite($temp, "\n");
-        rewind($temp);
+        return $delimiter;
+    }
 
+    /**
+     * Parse CSV rows while attempting to recover from malformed records.
+     *
+     * @param string $contents
+     * @param string $delimiter
+     * @param bool   $skipEmpty
+     * @return array{rows: array<int, array<int, string>>, errors: array<int, array<string, mixed>>}
+     */
+    private static function parse_rows_with_recovery($contents, $delimiter, $skipEmpty) {
         $rows = [];
-        if (function_exists('ini_set')) {
-            @ini_set('auto_detect_line_endings', '1');
-        }
+        $errors = [];
 
-        while (($data = fgetcsv($temp, 0, $delimiter)) !== false) {
-            if ($data === null) {
+        $length = strlen($contents);
+        $currentRow = [];
+        $currentField = '';
+        $inQuotes = false;
+        $skippingRow = false;
+        $skipMinimumBreaks = 0;
+        $pendingRecovery = false;
+        $firstColumnPattern = null;
+        $isFirstRow = true;
+        $currentLine = 1;
+        $rowStartLine = 1;
+        $rawBuffer = '';
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $contents[$i];
+
+            if ($rawBuffer === '') {
+                $rowStartLine = $currentLine;
+            }
+
+            if ($char === "\r") {
                 continue;
             }
 
-            // Trim whitespace and normalise nulls to empty strings.
-            foreach ($data as $index => $value) {
-                if ($value === null) {
-                    $data[$index] = '';
-                } else {
-                    $data[$index] = is_string($value) ? trim($value) : $value;
+            if ($skippingRow) {
+                if ($char === "\n") {
+                    $lookahead = substr($contents, $i + 1, 400);
+                    if ($skipMinimumBreaks > 0) {
+                        $skipMinimumBreaks--;
+                    }
+                    if ($skipMinimumBreaks <= 0 && self::looks_like_new_row($lookahead, $delimiter)) {
+                        $skippingRow = false;
+                        $currentRow = [];
+                        $currentField = '';
+                        $rawBuffer = '';
+                        $pendingRecovery = true;
+                        $skipMinimumBreaks = 0;
+                    }
+                    $currentLine++;
                 }
+                continue;
             }
 
-            if ($args['skip_empty']) {
-                $nonEmpty = array_filter($data, function ($item) {
-                    return $item !== '' && $item !== null;
-                });
-                if (empty($nonEmpty)) {
+            $rawBuffer .= $char;
+
+            if ($char === '"') {
+                if ($inQuotes) {
+                    if ($i + 1 < $length && $contents[$i + 1] === '"') {
+                        $currentField .= '"';
+                        $rawBuffer   .= '"';
+                        $i++;
+                    } else {
+                        $inQuotes = false;
+                    }
+                } else {
+                    if ($currentField === '' || trim($currentField) === '') {
+                        $currentField = '';
+                        $inQuotes = true;
+                    } else {
+                        $errors[] = self::build_parse_error($rowStartLine, $rawBuffer, 'unexpected_quote');
+                        $skippingRow = true;
+                        $skipMinimumBreaks = 1;
+                        $currentRow = [];
+                        $currentField = '';
+                        $rawBuffer = '';
+                        $inQuotes = false;
+                    }
+                }
+                continue;
+            }
+
+            if ($char === $delimiter && !$inQuotes) {
+                self::finalize_field($currentRow, $currentField);
+                continue;
+            }
+
+            if ($char === "\n") {
+                if ($inQuotes) {
+                    $lookahead = substr($contents, $i + 1, 400);
+                    if (self::looks_like_new_row($lookahead, $delimiter)) {
+                        if (!empty($currentRow) || $currentField !== '') {
+                            $errors[] = self::build_parse_error($rowStartLine, $rawBuffer, 'unterminated_quote');
+                        }
+                        $currentRow = [];
+                        $currentField = '';
+                        $rawBuffer = '';
+                        $inQuotes = false;
+                        $currentLine++;
+                        continue;
+                    }
+
+                    $currentField .= "\n";
+                    $currentLine++;
+                    continue;
+                }
+
+                self::finalize_field($currentRow, $currentField);
+
+                if ($pendingRecovery) {
+                    $shouldSkip = true;
+                    $firstValue = isset($currentRow[0]) ? $currentRow[0] : '';
+                    if ($firstColumnPattern === 'numeric') {
+                        $shouldSkip = !self::value_is_numeric_like($firstValue);
+                    } else {
+                        $shouldSkip = false;
+                    }
+                    if ($shouldSkip) {
+                        if (!empty($currentRow) || $rawBuffer !== '') {
+                            $errors[] = self::build_parse_error($rowStartLine, $rawBuffer, 'dangling_row');
+                        }
+                    } elseif (!$skipEmpty || self::row_has_value($currentRow)) {
+                        $rows[] = $currentRow;
+                        if ($isFirstRow) {
+                            $isFirstRow = false;
+                        } elseif (!empty($currentRow)) {
+                            self::update_first_column_pattern($firstColumnPattern, $currentRow[0]);
+                        }
+                    }
+                    $pendingRecovery = false;
+                } elseif (!$skipEmpty || self::row_has_value($currentRow)) {
+                    $rows[] = $currentRow;
+                    if ($isFirstRow) {
+                        $isFirstRow = false;
+                    } elseif (!empty($currentRow)) {
+                        self::update_first_column_pattern($firstColumnPattern, $currentRow[0]);
+                    }
+                }
+
+                $currentRow = [];
+                $currentField = '';
+                $rawBuffer = '';
+                $currentLine++;
+                continue;
+            }
+
+            if (!$inQuotes && ($char === ' ' || $char === "\t")) {
+                if ($currentField === '') {
                     continue;
                 }
             }
 
-            $rows[] = $data;
+            $currentField .= $char;
         }
 
-        fclose($temp);
+        if ($inQuotes) {
+            if (!empty($currentRow) || $currentField !== '') {
+                $errors[] = self::build_parse_error($rowStartLine, $rawBuffer, 'unterminated_quote');
+            }
+        } else {
+            self::finalize_field($currentRow, $currentField);
+            if (!empty($currentRow)) {
+                if ($pendingRecovery) {
+                    $shouldSkip = true;
+                    $firstValue = isset($currentRow[0]) ? $currentRow[0] : '';
+                    if ($firstColumnPattern === 'numeric') {
+                        $shouldSkip = !self::value_is_numeric_like($firstValue);
+                    } else {
+                        $shouldSkip = false;
+                    }
+                    if ($shouldSkip) {
+                        $errors[] = self::build_parse_error($rowStartLine, $rawBuffer, 'dangling_row');
+                    } elseif (!$skipEmpty || self::row_has_value($currentRow)) {
+                        $rows[] = $currentRow;
+                        if ($isFirstRow) {
+                            $isFirstRow = false;
+                        } elseif (!empty($currentRow)) {
+                            self::update_first_column_pattern($firstColumnPattern, $currentRow[0]);
+                        }
+                    }
+                    $pendingRecovery = false;
+                } elseif (!$skipEmpty || self::row_has_value($currentRow)) {
+                    $rows[] = $currentRow;
+                    if ($isFirstRow) {
+                        $isFirstRow = false;
+                    } elseif (!empty($currentRow)) {
+                        self::update_first_column_pattern($firstColumnPattern, $currentRow[0]);
+                    }
+                }
+            }
+        }
 
         return [
-            'rows'      => $rows,
-            'delimiter' => $delimiter,
-            'encoding'  => $encoding,
+            'rows'   => $rows,
+            'errors' => $errors,
         ];
     }
 
-    public static function writeCSV($filepath, $data) {
-        $handle = fopen($filepath, 'w');
-        foreach ($data as $row) {
-            fputcsv($handle, $row);
+    private static function finalize_field(&$currentRow, &$currentField) {
+        $value = $currentField;
+        $currentRow[] = is_string($value) ? trim($value) : $value;
+        $currentField = '';
+    }
+
+    private static function row_has_value($row) {
+        foreach ($row as $item) {
+            if ($item !== '' && $item !== null) {
+                return true;
+            }
         }
-        fclose($handle);
+        return false;
+    }
+
+    private static function looks_like_new_row($snippet, $delimiter) {
+        $snippet = ltrim($snippet, "\r\n");
+        if ($snippet === '') {
+            return false;
+        }
+
+        $newlinePos = strpos($snippet, "\n");
+        if ($newlinePos !== false) {
+            $snippet = substr($snippet, 0, $newlinePos);
+        }
+
+        $trimmed = ltrim($snippet);
+        if ($trimmed === '') {
+            return false;
+        }
+
+        if (strpos($trimmed, $delimiter) === false) {
+            return false;
+        }
+
+        if ($trimmed[0] === '"') {
+            $len = strlen($trimmed);
+            $inQuotes = true;
+            for ($i = 1; $i < $len; $i++) {
+                $char = $trimmed[$i];
+                if ($char === '"') {
+                    if ($i + 1 < $len && $trimmed[$i + 1] === '"') {
+                        $i++;
+                        continue;
+                    }
+                    $inQuotes = !$inQuotes;
+                    if (!$inQuotes) {
+                        $remaining = substr($trimmed, $i + 1);
+                        $remaining = ltrim($remaining);
+                        if ($remaining === '') {
+                            return true;
+                        }
+                        return isset($remaining[0]) && $remaining[0] === $delimiter;
+                    }
+                }
+            }
+            return false;
+        }
+
         return true;
+    }
+
+    private static function build_parse_error($line, $raw, $reason) {
+        $sample = $raw;
+        if (function_exists('mb_substr')) {
+            $sample = mb_substr($raw, 0, 160);
+        } else {
+            $sample = substr($raw, 0, 160);
+        }
+
+        return [
+            'line'   => $line,
+            'reason' => $reason,
+            'sample' => trim($sample),
+        ];
+    }
+
+    private static function update_first_column_pattern(&$pattern, $value) {
+        if (!is_string($value)) {
+            $value = (string) $value;
+        }
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return;
+        }
+
+        if ($pattern === 'numeric') {
+            if (!self::value_is_numeric_like($trimmed)) {
+                $pattern = 'mixed';
+            }
+            return;
+        }
+
+        if ($pattern === null) {
+            if (self::value_is_numeric_like($trimmed)) {
+                $pattern = 'numeric';
+            } else {
+                $pattern = 'mixed';
+            }
+            return;
+        }
+
+        if ($pattern === 'mixed') {
+            return;
+        }
+    }
+
+    private static function value_is_numeric_like($value) {
+        if (!is_string($value)) {
+            $value = (string) $value;
+        }
+        $value = trim($value);
+        if ($value === '') {
+            return false;
+        }
+        if (function_exists('mb_convert_kana')) {
+            $value = mb_convert_kana($value, 'n', 'UTF-8');
+        }
+        return preg_match('/^-?\d+$/', $value) === 1;
     }
 }
