@@ -7,7 +7,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Tooltip from '@mui/material/Tooltip';
 import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
-import isPlugin, { apiNonce } from '../isPlugin';
+import { apiNonce, apiEndpoint } from '../isPlugin';
 
 const typeOptions = [
   { value: 'INT', label: 'INT', desc: '整数型 -2147483648〜2147483647' },
@@ -41,7 +41,7 @@ const TableCreate = () => {
     if (addUpdated) {
       cols.push({ name: 'updated_at', type: 'DATETIME', default: '' });
     }
-    fetch('/wp-json/reactdb/v1/table/create', {
+    fetch(apiEndpoint('table/create'), {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': apiNonce },

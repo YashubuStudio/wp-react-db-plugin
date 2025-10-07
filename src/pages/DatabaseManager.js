@@ -13,7 +13,7 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
-import isPlugin, { apiNonce } from '../isPlugin';
+import isPlugin, { apiNonce, apiEndpoint } from '../isPlugin';
 
 const protectedTables = ['logs'];
 
@@ -27,7 +27,7 @@ const DatabaseManager = () => {
 
   useEffect(() => {
     if (isPlugin) {
-      fetch('/wp-json/reactdb/v1/tables', {
+      fetch(apiEndpoint('tables'), {
         credentials: 'include',
         headers: {
           'X-WP-Nonce': apiNonce
@@ -60,7 +60,7 @@ const DatabaseManager = () => {
   const fetchRows = (table) => {
     if (!table) return;
     if (isPlugin) {
-      fetch(`/wp-json/reactdb/v1/table/export?name=${table}`, {
+        fetch(apiEndpoint(`table/export?name=${table}`), {
         credentials: 'include',
         headers: { 'X-WP-Nonce': apiNonce }
       })
@@ -71,7 +71,7 @@ const DatabaseManager = () => {
             const body = data.map((row) => Object.values(row));
             setRows([header, ...body]);
           } else {
-            fetch(`/wp-json/reactdb/v1/table/info?name=${table}`, {
+            fetch(apiEndpoint(`table/info?name=${table}`), {
               credentials: 'include',
               headers: { 'X-WP-Nonce': apiNonce }
             })
@@ -100,7 +100,7 @@ const DatabaseManager = () => {
 
   const handleCopy = () => {
     if (!selected || !copyName) return;
-    fetch('/wp-json/reactdb/v1/table/copy', {
+    fetch(apiEndpoint('table/copy'), {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -111,7 +111,7 @@ const DatabaseManager = () => {
     })
       .then(() => {
         setCopyName('');
-        return fetch('/wp-json/reactdb/v1/tables', {
+        return fetch(apiEndpoint('tables'), {
           credentials: 'include',
           headers: { 'X-WP-Nonce': apiNonce }
         });
@@ -123,7 +123,7 @@ const DatabaseManager = () => {
   const handleDropTable = () => {
     if (!selected || protectedTables.includes(selected)) return;
     if (!window.confirm(`${selected} を削除します。よろしいですか？`)) return;
-    fetch('/wp-json/reactdb/v1/table/drop', {
+    fetch(apiEndpoint('table/drop'), {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -132,7 +132,7 @@ const DatabaseManager = () => {
       },
       body: JSON.stringify({ name: selected })
     })
-      .then(() => fetch('/wp-json/reactdb/v1/tables', { credentials: 'include', headers: { 'X-WP-Nonce': apiNonce } }))
+      .then(() => fetch(apiEndpoint('tables'), { credentials: 'include', headers: { 'X-WP-Nonce': apiNonce } }))
       .then(r => r.json())
       .then(data => {
         setTables(Array.isArray(data) ? data : []);
@@ -142,7 +142,7 @@ const DatabaseManager = () => {
   };
 
   const handleDelete = (id) => {
-    fetch('/wp-json/reactdb/v1/table/delete', {
+    fetch(apiEndpoint('table/delete'), {
       method: 'POST',
       credentials: 'include',
       headers: {

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
-import isPlugin, { apiNonce } from '../isPlugin';
+import isPlugin, { apiNonce, apiEndpoint } from '../isPlugin';
 
 const TableEditor = () => {
   const { table, id } = useParams();
@@ -32,11 +32,11 @@ const TableEditor = () => {
   useEffect(() => {
     if (!table) return;
     if (isPlugin) {
-      fetch(`/wp-json/reactdb/v1/table/info?name=${table}`, { headers: { 'X-WP-Nonce': apiNonce }, credentials: 'include' })
+      fetch(apiEndpoint(`table/info?name=${table}`), { headers: { 'X-WP-Nonce': apiNonce }, credentials: 'include' })
         .then(r => r.json())
         .then(cols => setColumns(Array.isArray(cols) ? cols : []));
       if (id) {
-        fetch(`/wp-json/reactdb/v1/table/row?name=${table}&id=${id}`, { headers: { 'X-WP-Nonce': apiNonce }, credentials: 'include' })
+        fetch(apiEndpoint(`table/row?name=${table}&id=${id}`), { headers: { 'X-WP-Nonce': apiNonce }, credentials: 'include' })
           .then(r => r.json())
           .then(row => setData(row));
       }
@@ -46,7 +46,7 @@ const TableEditor = () => {
   useEffect(() => {
     const uid = data.user_id;
     if (uid && isPlugin && !userNames[uid]) {
-      fetch(`/wp-json/reactdb/v1/user/${uid}`, { headers: { 'X-WP-Nonce': apiNonce }, credentials: 'include' })
+      fetch(apiEndpoint(`user/${uid}`), { headers: { 'X-WP-Nonce': apiNonce }, credentials: 'include' })
         .then(r => r.ok ? r.json() : null)
         .then(u => {
           if (u && u.name) {
@@ -61,7 +61,7 @@ const TableEditor = () => {
   };
 
   const handleSave = () => {
-    const endpoint = id ? '/wp-json/reactdb/v1/table/update' : '/wp-json/reactdb/v1/table/addrow';
+    const endpoint = apiEndpoint(id ? 'table/update' : 'table/addrow');
     const sanitized = { ...data };
     columns.forEach(col => {
       if (isReadonly(col)) {
@@ -78,7 +78,7 @@ const TableEditor = () => {
   };
 
   const handleDelete = () => {
-    fetch('/wp-json/reactdb/v1/table/delete', {
+    fetch(apiEndpoint('table/delete'), {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': apiNonce },

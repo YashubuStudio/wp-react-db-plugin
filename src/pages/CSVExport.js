@@ -5,7 +5,7 @@ import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import Link from '@mui/material/Link';
-import isPlugin, { apiNonce } from '../isPlugin';
+import isPlugin, { apiNonce, apiEndpoint } from '../isPlugin';
 
 const CSVExport = () => {
   const [downloadUrl, setDownloadUrl] = useState('');
@@ -14,7 +14,7 @@ const CSVExport = () => {
 
   useEffect(() => {
     if (isPlugin) {
-      fetch('/wp-json/reactdb/v1/tables', {
+      fetch(apiEndpoint('tables'), {
         credentials: 'include',
         headers: { 'X-WP-Nonce': apiNonce }
       })
@@ -28,7 +28,7 @@ const CSVExport = () => {
   const handleExport = () => {
     if (!selected) return;
     if (isPlugin) {
-      fetch(`/wp-json/reactdb/v1/table/export?name=${selected}`, {
+      fetch(apiEndpoint(`table/export?name=${selected}`), {
         credentials: 'include',
         headers: { 'X-WP-Nonce': apiNonce }
       })
