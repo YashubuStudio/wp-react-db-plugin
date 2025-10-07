@@ -147,11 +147,72 @@ add_action('rest_api_init', function () {
                 return new WP_Error('invalid_csv', 'CSV is empty', ['status' => 400]);
             }
 
+            $raw_header = array_shift($rows);
+            if (!$raw_header) {
+                return new WP_Error('invalid_csv', 'CSV header missing', ['status' => 400]);
+            }
+
+            $overrides_raw = $request->get_param('column_overrides');
+            $overrides = [];
+            if ($overrides_raw) {
+                if (is_string($overrides_raw)) {
+                    $decoded = json_decode($overrides_raw, true);
+                } else {
+                    $decoded = $overrides_raw;
+                }
+                if (is_array($decoded)) {
+                    foreach ($decoded as $idx => $value) {
+                        if (!is_numeric($idx) || !is_string($value)) {
+                            continue;
+                        }
+                        $sanitized = sanitize_key($value);
+                        $overrides[(int) $idx] = $sanitized;
+                    }
+                }
+            }
+
+            $header = [];
+            $used_keys = [];
+            $conflicts = [];
+            foreach ($raw_header as $idx => $label) {
+                $label = is_string($label) ? trim($label) : '';
+                $candidate = sanitize_key($label);
+                if (array_key_exists((int) $idx, $overrides)) {
+                    $candidate = $overrides[(int) $idx];
+                }
+                if ($candidate === '' || isset($used_keys[$candidate])) {
+                    $conflicts[] = [
+                        'index'    => (int) $idx,
+                        'original' => $label,
+                        'reason'   => $candidate === '' ? 'invalid' : 'duplicate',
+                    ];
+                    continue;
+                }
+                $used_keys[$candidate] = true;
+                $header[(int) $idx] = $candidate;
+            }
+
+            if (!empty($conflicts)) {
+                return new WP_Error(
+                    'column_override_required',
+                    '列名に日本語などが含まれているため、半角英数字の代替名が必要です。',
+                    [
+                        'status'  => 422,
+                        'columns' => array_map(function ($col) {
+                            return [
+                                'index'    => $col['index'],
+                                'original' => $col['original'],
+                                'reason'   => $col['reason'],
+                            ];
+                        }, $conflicts),
+                    ]
+                );
+            }
+
+            ksort($header);
+            $header = array_values($header);
+
             $charset_collate = $wpdb->get_charset_collate();
-            $header = array_map(function ($h) {
-                $h = sanitize_key($h);
-                return $h ?: 'col';
-            }, array_shift($rows));
 
             $sample = array_slice($rows, 0, 100);
             $types = [];
