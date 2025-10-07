@@ -7,7 +7,7 @@ import TextField from '@mui/material/TextField';
 import Alert from '@mui/material/Alert';
 import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
-import isPlugin, { apiNonce } from '../isPlugin';
+import isPlugin, { apiNonce, apiEndpoint } from '../isPlugin';
 
 const normalizeOverride = (value) => {
   if (typeof value !== 'string') return '';
@@ -68,7 +68,7 @@ const CSVImport = () => {
     setLogSeverity('info');
 
     try {
-      const response = await fetch('/wp-json/reactdb/v1/table/import', {
+      const response = await fetch(apiEndpoint('table/import'), {
         method: 'POST',
         credentials: 'include',
         headers: { 'X-WP-Nonce': apiNonce },

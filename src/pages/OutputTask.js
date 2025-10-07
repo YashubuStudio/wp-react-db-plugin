@@ -5,7 +5,7 @@ import Button from '@mui/material/Button';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import isPlugin, { apiNonce } from '../isPlugin';
+import isPlugin, { apiNonce, apiEndpoint } from '../isPlugin';
 import HTMLPreview from '../components/HTMLPreview';
 
 const OutputTask = () => {
@@ -33,14 +33,14 @@ const OutputTask = () => {
       }
     };
     if (isPlugin) {
-      fetch(`/wp-json/reactdb/v1/table/info?name=${config.table}`, {
+      fetch(apiEndpoint(`table/info?name=${config.table}`), {
         credentials: 'include',
         headers: { 'X-WP-Nonce': apiNonce }
       })
         .then(r => r.json())
         .then(data => handleCols(Array.isArray(data) ? data.map(c => c.Field) : []))
         .catch(() => handleCols([]));
-      fetch(`/wp-json/reactdb/v1/table/export?name=${config.table}`, {
+      fetch(apiEndpoint(`table/export?name=${config.table}`), {
         credentials: 'include',
         headers: { 'X-WP-Nonce': apiNonce }
       })
@@ -55,7 +55,7 @@ const OutputTask = () => {
 
   useEffect(() => {
     if (isPlugin) {
-      fetch('/wp-json/reactdb/v1/output/settings', {
+      fetch(apiEndpoint('output/settings'), {
         credentials: 'include',
         headers: { 'X-WP-Nonce': apiNonce }
       })
@@ -69,7 +69,7 @@ const OutputTask = () => {
             html: c.html || ''
           });
         });
-      fetch('/wp-json/reactdb/v1/tables', {
+      fetch(apiEndpoint('tables'), {
         credentials: 'include',
         headers: { 'X-WP-Nonce': apiNonce }
       })
@@ -84,7 +84,7 @@ const OutputTask = () => {
     if (!task || !config.table) return;
     const newSettings = { ...settings, [task]: config };
     if (isPlugin) {
-      fetch('/wp-json/reactdb/v1/output/settings', {
+      fetch(apiEndpoint('output/settings'), {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': apiNonce },
@@ -104,7 +104,7 @@ const OutputTask = () => {
     const newSettings = { ...settings };
     delete newSettings[task];
     if (isPlugin) {
-      fetch('/wp-json/reactdb/v1/output/settings', {
+      fetch(apiEndpoint('output/settings'), {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': apiNonce },
@@ -117,7 +117,7 @@ const OutputTask = () => {
     }
   };
 
-  const endpoint = `/wp-json/reactdb/v1/output/${task}`;
+  const endpoint = apiEndpoint(`output/${task}`);
   const previewData = sampleRow || columns.reduce((acc, col) => ({ ...acc, [col]: col }), {});
 
   return (

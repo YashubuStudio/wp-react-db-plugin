@@ -70,7 +70,8 @@ function reactdb_app_shortcode() {
         'isPlugin'    => true,
         'currentUser' => $user->display_name,
         'logoutUrl'   => wp_logout_url(),
-        'nonce'       => wp_create_nonce('wp_rest')
+        'nonce'       => wp_create_nonce('wp_rest'),
+        'apiBase'     => esc_url_raw(rest_url('reactdb/v1/'))
     ]);
 
     return ob_get_clean();

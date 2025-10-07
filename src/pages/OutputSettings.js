@@ -5,7 +5,7 @@ import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { Link } from 'react-router-dom';
-import isPlugin, { apiNonce } from '../isPlugin';
+import isPlugin, { apiNonce, apiEndpoint } from '../isPlugin';
 
 const OutputSettings = () => {
   const [settings, setSettings] = useState({});
@@ -18,7 +18,7 @@ const OutputSettings = () => {
     const newSettings = { ...settings };
     delete newSettings[name];
     if (isPlugin) {
-      fetch('/wp-json/reactdb/v1/output/settings', {
+      fetch(apiEndpoint('output/settings'), {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': apiNonce },
@@ -33,13 +33,13 @@ const OutputSettings = () => {
 
   useEffect(() => {
     if (isPlugin) {
-      fetch('/wp-json/reactdb/v1/output/settings', {
+      fetch(apiEndpoint('output/settings'), {
         credentials: 'include',
         headers: { 'X-WP-Nonce': apiNonce }
       })
         .then(r => r.json())
         .then(data => setSettings(data));
-      fetch('/wp-json/reactdb/v1/tables', {
+      fetch(apiEndpoint('tables'), {
         credentials: 'include',
         headers: { 'X-WP-Nonce': apiNonce }
       })
@@ -54,7 +54,7 @@ const OutputSettings = () => {
     if (!task || !table) return;
     const newSettings = { ...settings, [task]: { table, format, html: '' } };
     if (isPlugin) {
-      fetch('/wp-json/reactdb/v1/output/settings', {
+      fetch(apiEndpoint('output/settings'), {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': apiNonce },

@@ -7,7 +7,7 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
-import isPlugin, { apiNonce } from '../isPlugin';
+import isPlugin, { apiNonce, apiEndpoint } from '../isPlugin';
 
 const Logs = () => {
   const [logs, setLogs] = useState([]);
@@ -16,7 +16,7 @@ const Logs = () => {
 
   useEffect(() => {
     if (isPlugin) {
-      fetch('/wp-json/reactdb/v1/logs', {
+      fetch(apiEndpoint('logs'), {
         credentials: 'include',
         headers: {
           'X-WP-Nonce': apiNonce
@@ -64,7 +64,7 @@ const Logs = () => {
     const ids = logs.map((l) => l.user_id).filter((id) => id && !userNames[id]);
     ids.forEach((id) => {
       if (isPlugin) {
-        fetch(`/wp-json/reactdb/v1/user/${id}`, { headers: { 'X-WP-Nonce': apiNonce }, credentials: 'include' })
+        fetch(apiEndpoint(`user/${id}`), { headers: { 'X-WP-Nonce': apiNonce }, credentials: 'include' })
           .then((r) => (r.ok ? r.json() : null))
           .then((u) => {
             if (u && u.name) {
