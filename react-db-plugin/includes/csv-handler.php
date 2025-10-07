@@ -215,7 +215,15 @@ class CSVHandler {
             if ($char === "\n") {
                 if ($inQuotes) {
                     $lookahead = substr($contents, $i + 1, 400);
-                    if (self::looks_like_new_row($lookahead, $delimiter)) {
+                    $looksLikeNextRow = self::looks_like_new_row($lookahead, $delimiter);
+                    if ($looksLikeNextRow) {
+                        $matchesPattern = self::lookahead_matches_first_column_pattern($lookahead, $firstColumnPattern, $delimiter);
+                        $matchesExpected = self::lookahead_matches_expected_columns($lookahead, $delimiter, $expectedColumns);
+                    } else {
+                        $matchesPattern = false;
+                        $matchesExpected = false;
+                    }
+                    if ($looksLikeNextRow && $matchesPattern && ($expectedColumns === null || $matchesExpected)) {
                         if (!empty($currentRow) || $currentField !== '') {
                             $errors[] = self::build_parse_error($rowStartLine, $rawBuffer, 'unterminated_quote');
                         }
@@ -237,7 +245,8 @@ class CSVHandler {
                     $lookahead = substr($contents, $i + 1, 400);
                     $looksLikeNextRow = self::looks_like_new_row($lookahead, $delimiter);
                     $matchesPattern = self::lookahead_matches_first_column_pattern($lookahead, $firstColumnPattern, $delimiter);
-                    if (!$looksLikeNextRow || !$matchesPattern) {
+                    $matchesExpected = self::lookahead_matches_expected_columns($lookahead, $delimiter, $expectedColumns);
+                    if (!$looksLikeNextRow || !$matchesPattern || !$matchesExpected) {
                         $currentField .= "\n";
                         $currentLine++;
                         continue;
@@ -384,7 +393,8 @@ class CSVHandler {
             return false;
         }
 
-        if (strpos($trimmed, $delimiter) === false) {
+        $delimiterPos = strpos($trimmed, $delimiter);
+        if ($delimiterPos === false) {
             return false;
         }
 
@@ -409,6 +419,11 @@ class CSVHandler {
                     }
                 }
             }
+            return false;
+        }
+
+        $firstField = substr($trimmed, 0, $delimiterPos);
+        if (substr_count($firstField, '"') % 2 !== 0) {
             return false;
         }
 
@@ -444,6 +459,51 @@ class CSVHandler {
         }
 
         return true;
+    }
+
+    private static function lookahead_matches_expected_columns($snippet, $delimiter, $expectedColumns) {
+        if ($expectedColumns === null) {
+            return true;
+        }
+
+        $snippet = ltrim($snippet, "\r\n");
+        if ($snippet === '') {
+            return false;
+        }
+
+        $newlinePos = strpos($snippet, "\n");
+        if ($newlinePos !== false) {
+            $snippet = substr($snippet, 0, $newlinePos);
+        }
+
+        if ($snippet === '') {
+            return false;
+        }
+
+        $len = strlen($snippet);
+        $inQuotes = false;
+        $fieldCount = 1;
+
+        for ($i = 0; $i < $len; $i++) {
+            $char = $snippet[$i];
+            if ($char === '"') {
+                if ($inQuotes && $i + 1 < $len && $snippet[$i + 1] === '"') {
+                    $i++;
+                    continue;
+                }
+                $inQuotes = !$inQuotes;
+                continue;
+            }
+
+            if ($char === $delimiter && !$inQuotes) {
+                $fieldCount++;
+                if ($fieldCount > $expectedColumns) {
+                    return false;
+                }
+            }
+        }
+
+        return $fieldCount === $expectedColumns;
     }
 
     private static function build_parse_error($line, $raw, $reason) {
