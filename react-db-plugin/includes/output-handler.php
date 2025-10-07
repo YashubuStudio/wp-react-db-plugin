@@ -18,6 +18,11 @@ class OutputHandler {
             if (isset($conf['html'])) {
                 $settings[$task]['html'] = wp_kses_post($conf['html']);
             }
+            if (isset($conf['css'])) {
+                $settings[$task]['css'] = wp_strip_all_tags(is_string($conf['css']) ? $conf['css'] : '');
+            } elseif (!isset($settings[$task]['css'])) {
+                $settings[$task]['css'] = '';
+            }
         }
         update_option('reactdb_output_settings', $settings);
     }
@@ -40,8 +45,12 @@ class OutputHandler {
         if (!$rows) {
             return '<div>No data</div>';
         }
+        $css = !empty($config['css']) ? trim($config['css']) : '';
         if (!empty($config['html'])) {
             ob_start();
+            if ($css !== '') {
+                echo '<style>' . $css . '</style>';
+            }
             foreach ($rows as $row) {
                 $html = $config['html'];
                 foreach ($row as $k => $v) {
@@ -52,6 +61,9 @@ class OutputHandler {
             return ob_get_clean();
         }
         ob_start();
+        if ($css !== '') {
+            echo '<style>' . $css . '</style>';
+        }
         echo '<ul class="reactdb-output-list">';
         foreach ($rows as $row) {
             echo '<li>' . esc_html(join(' | ', $row)) . '</li>';

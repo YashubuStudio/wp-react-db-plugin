@@ -52,7 +52,7 @@ const OutputSettings = () => {
 
   const handleSave = () => {
     if (!task || !table) return;
-    const newSettings = { ...settings, [task]: { table, format, html: '' } };
+    const newSettings = { ...settings, [task]: { table, format, html: '', css: '' } };
     if (isPlugin) {
       fetch(apiEndpoint('output/settings'), {
         method: 'POST',

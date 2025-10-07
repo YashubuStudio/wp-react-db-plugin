@@ -11,13 +11,15 @@ import HTMLPreview from '../components/HTMLPreview';
 const OutputTask = () => {
   const { task } = useParams();
   const [settings, setSettings] = useState({});
-  const [config, setConfig] = useState({ table: '', format: 'html', html: '' });
+  const [config, setConfig] = useState({ table: '', format: 'html', html: '', css: '' });
   const [tables, setTables] = useState([]);
   const [columns, setColumns] = useState([]);
   const [sampleRow, setSampleRow] = useState(null);
   // fetch columns and sample row when table selected
   useEffect(() => {
-    if (!config.table) {
+    const selectedTable = config.table;
+    const currentFormat = config.format;
+    if (!selectedTable) {
       setColumns([]);
       setSampleRow(null);
       return;
@@ -25,22 +27,27 @@ const OutputTask = () => {
     const handleCols = (cols) => {
       const names = Array.isArray(cols) ? cols : [];
       setColumns(names);
-      if (config.format === 'html' && !config.html && names.length > 0) {
-        const snippet = `<div class="reactdb-row">\n  ${names
-          .map(c => `{{${c}}}`)
-          .join(' | ')}\n</div>`;
-        setConfig(cfg => ({ ...cfg, html: snippet }));
+      if (currentFormat === 'html' && names.length > 0) {
+        setConfig(cfg => {
+          if (cfg.html) {
+            return cfg;
+          }
+          const snippet = `<div class="reactdb-row">\n  ${names
+            .map(c => `{{${c}}}`)
+            .join(' | ')}\n</div>`;
+          return { ...cfg, html: snippet };
+        });
       }
     };
     if (isPlugin) {
-      fetch(apiEndpoint(`table/info?name=${config.table}`), {
+      fetch(apiEndpoint(`table/info?name=${selectedTable}`), {
         credentials: 'include',
         headers: { 'X-WP-Nonce': apiNonce }
       })
         .then(r => r.json())
         .then(data => handleCols(Array.isArray(data) ? data.map(c => c.Field) : []))
         .catch(() => handleCols([]));
-      fetch(apiEndpoint(`table/export?name=${config.table}`), {
+      fetch(apiEndpoint(`table/export?name=${selectedTable}`), {
         credentials: 'include',
         headers: { 'X-WP-Nonce': apiNonce }
       })
@@ -51,7 +58,7 @@ const OutputTask = () => {
       handleCols(['id', 'value']);
       setSampleRow({ id: 1, value: 'sample' });
     }
-  }, [config.table, config.format]);
+    }, [config.table, config.format]);
 
   useEffect(() => {
     if (isPlugin) {
@@ -66,7 +73,8 @@ const OutputTask = () => {
           setConfig({
             table: c.table || '',
             format: c.format || 'html',
-            html: c.html || ''
+            html: c.html || '',
+            css: c.css || ''
           });
         });
       fetch(apiEndpoint('tables'), {
@@ -144,6 +152,7 @@ const OutputTask = () => {
         )}
         {config.format === 'html' && (
           <>
+            <TextField label="CSS" multiline minRows={4} value={config.css} onChange={e => setConfig({ ...config, css: e.target.value })} sx={{ mb: 2 }} />
             <TextField label="HTML" multiline minRows={4} value={config.html} onChange={e => setConfig({ ...config, html: e.target.value })} sx={{ mb: 2 }} />
             <Typography variant="body1" sx={{ mb: 2, fontSize: '1rem' }}>
               ショートコード: [reactdb_output task="{task}"]
@@ -159,7 +168,7 @@ const OutputTask = () => {
         </Box>
         </Box>
         {config.format === 'html' && (
-          <HTMLPreview html={config.html} data={previewData} />
+          <HTMLPreview html={config.html} css={config.css} data={previewData} />
         )}
       </Box>
     </Box>
