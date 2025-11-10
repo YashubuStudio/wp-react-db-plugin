@@ -2,6 +2,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Checkbox from '@mui/material/Checkbox';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import FormGroup from '@mui/material/FormGroup';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
@@ -102,7 +105,7 @@ const serializeFilters = filters => (Array.isArray(filters) ? filters : []).map(
 const OutputTask = () => {
   const { task } = useParams();
   const [settings, setSettings] = useState({});
-  const [config, setConfig] = useState({ table: '', format: 'html', html: '', css: '', filterCss: '', filters: [] });
+  const [config, setConfig] = useState({ table: '', format: 'html', html: '', css: '', filterCss: '', filters: [], search: { enabled: false, columns: [] } });
   const [tables, setTables] = useState([]);
   const [columns, setColumns] = useState([]);
   const [sampleRow, setSampleRow] = useState(null);
@@ -114,7 +117,13 @@ const OutputTask = () => {
       html: entry.html || '',
       css: entry.css || '',
       filterCss: typeof entry.filterCss === 'string' ? entry.filterCss : '',
-      filters: normalizeFilters(entry.filters, entry.dateField, entry.categoryField)
+      filters: normalizeFilters(entry.filters, entry.dateField, entry.categoryField),
+      search: {
+        enabled: !!(entry.search && (entry.search.enabled || entry.search === true)),
+        columns: Array.isArray(entry.search && entry.search.columns)
+          ? entry.search.columns.filter(col => typeof col === 'string')
+          : []
+      }
     });
   }, [task]);
   // fetch columns and sample row when table selected
@@ -138,6 +147,12 @@ const OutputTask = () => {
           next.html = snippet;
         }
         next.filters = ensureValidFilters(cfg.filters, names);
+        if (cfg.search && Array.isArray(cfg.search.columns)) {
+          next.search = {
+            enabled: !!cfg.search.enabled && cfg.search.columns.some(column => names.includes(column)),
+            columns: cfg.search.columns.filter(column => names.includes(column))
+          };
+        }
         return next;
       });
     };
@@ -185,13 +200,40 @@ const OutputTask = () => {
     }
   }, [task, applySettingsToConfig]);
 
+  useEffect(() => {
+    setConfig(cfg => {
+      if (!cfg.search || !Array.isArray(cfg.search.columns)) {
+        return cfg;
+      }
+      const valid = cfg.search.columns.filter(column => columns.includes(column));
+      if (valid.length === cfg.search.columns.length) {
+        return cfg;
+      }
+      return {
+        ...cfg,
+        search: {
+          ...cfg.search,
+          enabled: cfg.search.enabled && valid.length > 0,
+          columns: valid
+        }
+      };
+    });
+  }, [columns]);
+
   const handleSave = () => {
     if (!task || !config.table) return;
+    const searchColumns = Array.isArray(config.search?.columns)
+      ? config.search.columns.filter(column => columns.includes(column))
+      : [];
     const preparedConfig = {
       ...config,
       filters: serializeFilters(config.filters),
       dateField: '',
-      categoryField: ''
+      categoryField: '',
+      search: {
+        enabled: Boolean(config.search?.enabled) && searchColumns.length > 0,
+        columns: searchColumns
+      }
     };
     const newSettings = { ...settings, [task]: preparedConfig };
     if (isPlugin) {
@@ -295,6 +337,7 @@ const OutputTask = () => {
 
   const endpoint = apiEndpoint(`output/${task}`);
   const previewData = sampleRow || columns.reduce((acc, col) => ({ ...acc, [col]: col }), {});
+  const searchConfig = config.search || { enabled: false, columns: [] };
 
   return (
     <Box>
@@ -306,7 +349,12 @@ const OutputTask = () => {
             fullWidth
             label="テーブル"
             value={config.table}
-            onChange={e => setConfig(cfg => ({ ...cfg, table: e.target.value, filters: [] }))}
+            onChange={e => setConfig(cfg => ({
+              ...cfg,
+              table: e.target.value,
+              filters: [],
+              search: { ...cfg.search, columns: [] }
+            }))}
           >
             <MenuItem value="">選択</MenuItem>
             {tables.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
@@ -316,7 +364,7 @@ const OutputTask = () => {
             fullWidth
             label="形式"
             value={config.format}
-            onChange={e => setConfig({ ...config, format: e.target.value })}
+            onChange={e => setConfig(cfg => ({ ...cfg, format: e.target.value }))}
           >
             <MenuItem value="html">HTML</MenuItem>
             <MenuItem value="json">JSON</MenuItem>
@@ -337,6 +385,70 @@ const OutputTask = () => {
               </Typography>
             )}
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              <Box sx={{ border: '1px solid', borderColor: 'grey.300', borderRadius: 1, p: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                <FormControlLabel
+                  control={(
+                    <Checkbox
+                      checked={!!searchConfig.enabled}
+                      onChange={e => setConfig(cfg => ({
+                        ...cfg,
+                        search: {
+                          enabled: e.target.checked,
+                          columns: e.target.checked ? cfg.search?.columns || [] : []
+                        }
+                      }))}
+                      disabled={columns.length === 0}
+                    />
+                  )}
+                  label="検索欄を追加する"
+                />
+                {searchConfig.enabled && (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      検索対象にするフィールドを選択してください。
+                    </Typography>
+                    {columns.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary">
+                        テーブルを選択すると検索対象を指定できます。
+                      </Typography>
+                    ) : (
+                      <FormGroup sx={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap' }}>
+                        {columns.map(column => {
+                          const selected = Array.isArray(searchConfig.columns) && searchConfig.columns.includes(column);
+                          return (
+                            <FormControlLabel
+                              key={`search-column-${column}`}
+                              control={(
+                                <Checkbox
+                                  checked={selected}
+                                  onChange={e => {
+                                    const checked = e.target.checked;
+                                    setConfig(cfg => {
+                                      const current = Array.isArray(cfg.search?.columns) ? cfg.search.columns : [];
+                                      const nextColumns = checked
+                                        ? [...current.filter(col => col !== column), column]
+                                        : current.filter(col => col !== column);
+                                      return {
+                                        ...cfg,
+                                        search: {
+                                          ...cfg.search,
+                                          enabled: checked ? true : nextColumns.length > 0 && cfg.search?.enabled,
+                                          columns: nextColumns
+                                        }
+                                      };
+                                    });
+                                  }}
+                                />
+                              )}
+                              label={column}
+                            />
+                          );
+                        })}
+                      </FormGroup>
+                    )}
+                  </Box>
+                )}
+              </Box>
               {filters.length === 0 && (
                 <Typography variant="body2" color="text.secondary">
                   フィルターは未設定です。「フィルターを追加」を押してタブを作成してください。

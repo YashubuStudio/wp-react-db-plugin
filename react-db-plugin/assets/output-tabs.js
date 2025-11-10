@@ -19,7 +19,25 @@
       });
   }
 
-  function applyFilters(container, filters) {
+  function tokenizeSearch(query) {
+    if (!query) {
+      return [];
+    }
+    return query
+      .toString()
+      .toLowerCase()
+      .split(/\s+/)
+      .map(function (token) {
+        return token.trim();
+      })
+      .filter(function (token) {
+        return token.length > 0;
+      });
+  }
+
+  function applyFilters(container, state) {
+    var filters = state.filters || {};
+    var searchTokens = state.searchTokens || [];
     var items = toArray(container.querySelectorAll('.reactdb-item'));
     items.forEach(function (item) {
       var visible = true;
@@ -41,6 +59,20 @@
           visible = false;
         }
       });
+      if (visible && searchTokens.length > 0) {
+        var indexAttr = item.getAttribute('data-search-index') || '';
+        var target = indexAttr.toLowerCase();
+        if (!target) {
+          visible = false;
+        } else {
+          var hasAll = searchTokens.every(function (token) {
+            return target.indexOf(token) !== -1;
+          });
+          if (!hasAll) {
+            visible = false;
+          }
+        }
+      }
       item.style.display = visible ? '' : 'none';
     });
   }
@@ -53,7 +85,10 @@
       return;
     }
     container.dataset.reactdbTabsInit = '1';
-    var filters = {};
+    var state = {
+      filters: {},
+      searchTokens: []
+    };
     var groups = toArray(container.querySelectorAll('.reactdb-tab-group[data-filter]'));
 
     groups.forEach(function (group) {
@@ -61,12 +96,12 @@
       if (!key) {
         return;
       }
-      filters[key] = '';
+      state.filters[key] = '';
       var buttons = toArray(group.querySelectorAll('[data-value]'));
       buttons.forEach(function (btn) {
         btn.addEventListener('click', function () {
           var value = btn.getAttribute('data-value') || '';
-          filters[key] = value;
+          state.filters[key] = value;
           buttons.forEach(function (b) {
             if (b === btn) {
               b.classList.add('is-active');
@@ -74,7 +109,7 @@
               b.classList.remove('is-active');
             }
           });
-          applyFilters(container, filters);
+          applyFilters(container, state);
         });
       });
       var defaultBtn = group.querySelector('[data-default="1"]');
@@ -83,7 +118,18 @@
       }
     });
 
-    applyFilters(container, filters);
+    var searchInput = container.querySelector('.reactdb-search-input');
+    if (searchInput) {
+      var handleSearch = function () {
+        var query = searchInput.value || '';
+        state.searchTokens = tokenizeSearch(query);
+        applyFilters(container, state);
+      };
+      searchInput.addEventListener('input', handleSearch);
+      handleSearch();
+    } else {
+      applyFilters(container, state);
+    }
   }
 
   function initAll() {
