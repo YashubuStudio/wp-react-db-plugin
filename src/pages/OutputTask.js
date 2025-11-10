@@ -26,96 +26,103 @@ const SORT_OPTIONS = [
 const FILTER_CSS_TEMPLATE = `/* === Filter CSS Template (matches default front-end styles) === */
 .reactdb-tabbed-output {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: stretch;
   gap: 1.5rem;
   width: 100%;
 }
 
-.reactdb-tabbed-output .reactdb-tabbed-controls {
+.reactdb-tabbed-output .reactdb-output-controlPanel {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  flex: 0 0 260px;
-  max-width: min(320px, 100%);
+  gap: 1.25rem;
+  width: 100%;
 }
 
-.reactdb-tabbed-output .reactdb-tabbed-content {
-  flex: 1 1 0%;
-  min-width: 0;
-}
-
-.reactdb-tabbed-output .reactdb-search {
+.reactdb-tabbed-output .reactdb-output-searchBlock {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid #e3e3e3;
+  border-radius: 0.75rem;
+  background: #f9fafc;
+}
+
+.reactdb-tabbed-output .reactdb-output-searchLabel {
+  display: flex;
+  flex-direction: column;
   gap: 0.5rem;
 }
 
-.reactdb-tabbed-output .reactdb-search-label {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.reactdb-tabbed-output .reactdb-search-title {
+.reactdb-tabbed-output .reactdb-output-searchTitle {
   font-weight: 600;
-}
-
-.reactdb-tabbed-output .reactdb-search-input {
-  min-width: 200px;
-  padding: 0.35rem 0.75rem;
-  border: 1px solid #d0d0d0;
-  border-radius: 999px;
   font-size: 0.95rem;
 }
 
-.reactdb-tabbed-output .reactdb-search-input:focus {
+.reactdb-tabbed-output .reactdb-output-searchInput {
+  padding: 0.5rem 0.85rem;
+  border: 1px solid #d0d7de;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  max-width: 100%;
+}
+
+.reactdb-tabbed-output .reactdb-output-searchInput:focus {
   outline: none;
   border-color: #1976d2;
   box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
 }
 
-.reactdb-tabbed-output .reactdb-tabbed-controls .reactdb-tab-group {
+.reactdb-tabbed-output .reactdb-output-filterGroup {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid #e3e3e3;
+  border-radius: 0.75rem;
+  background: #ffffff;
 }
 
-.reactdb-tabbed-output .reactdb-tab-title {
+.reactdb-tabbed-output .reactdb-output-filterTitle {
   font-weight: 600;
+  font-size: 0.95rem;
 }
 
-.reactdb-tabbed-output .reactdb-tab-list {
+.reactdb-tabbed-output .reactdb-output-filterList {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
+  gap: 0.5rem;
 }
 
-.reactdb-tabbed-output .reactdb-tab-button {
-  border: 1px solid #d0d0d0;
+.reactdb-tabbed-output .reactdb-output-filterButton {
+  border: 1px solid #d0d7de;
   border-radius: 999px;
-  padding: 0.3rem 0.75rem;
-  background: #f5f5f5;
+  padding: 0.35rem 0.85rem;
+  background: #f1f5f9;
   cursor: pointer;
   font-size: 0.9rem;
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.reactdb-tabbed-output .reactdb-tab-button:hover {
-  background: #e0e0e0;
+.reactdb-tabbed-output .reactdb-output-filterButton:hover {
+  background: #e2e8f0;
 }
 
-.reactdb-tabbed-output .reactdb-tab-button.is-active {
+.reactdb-tabbed-output .reactdb-output-filterButton.is-active {
   background: #1976d2;
   color: #fff;
   border-color: #1976d2;
+  box-shadow: 0 0 0 1px rgba(25, 118, 210, 0.3);
 }
 
-.reactdb-tabbed-output .reactdb-tabbed-content .reactdb-output-items {
+.reactdb-tabbed-output .reactdb-tabbed-content {
+  width: 100%;
+}
+
+.reactdb-tabbed-output .reactdb-output-items {
   display: grid;
-  gap: 0.75rem;
+  gap: 1rem;
   width: 100%;
 }
 
@@ -126,23 +133,12 @@ const FILTER_CSS_TEMPLATE = `/* === Filter CSS Template (matches default front-e
   background: #fff;
 }
 
-@media (max-width: 768px) {
-  .reactdb-tabbed-output {
-    flex-direction: column;
-    gap: 1rem;
+@media (min-width: 768px) {
+  .reactdb-tabbed-output .reactdb-output-items {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   }
-
-  .reactdb-tabbed-output .reactdb-tabbed-controls,
-  .reactdb-tabbed-output .reactdb-tabbed-content {
-    flex: 1 1 100%;
-    max-width: 100%;
-  }
-
-  .reactdb-tabbed-output .reactdb-search-input {
-    min-width: 0;
-    width: 100%;
-  }
-}`;
+}
+`;
 
 const FILTER_DEFAULTS = {
   label: '',
@@ -464,8 +460,8 @@ const OutputTask = () => {
   return (
     <Box>
       <Typography variant="h5" gutterBottom>タスク設定: {task}</Typography>
-      <Box sx={{ display: 'flex' }}>
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: 640, gap: 2 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', maxWidth: 720, gap: 2 }}>
           <TextField
             select
             fullWidth

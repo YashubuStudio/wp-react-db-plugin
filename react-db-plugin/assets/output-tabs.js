@@ -89,7 +89,7 @@
       filters: {},
       searchTokens: []
     };
-    var groups = toArray(container.querySelectorAll('.reactdb-tab-group[data-filter]'));
+    var groups = toArray(container.querySelectorAll('.reactdb-output-filterGroup[data-filter]'));
 
     groups.forEach(function (group) {
       var key = group.getAttribute('data-filter');
@@ -118,7 +118,7 @@
       }
     });
 
-    var searchInput = container.querySelector('.reactdb-search-input');
+    var searchInput = container.querySelector('.reactdb-output-searchInput');
     if (searchInput) {
       var handleSearch = function () {
         var query = searchInput.value || '';

@@ -25,7 +25,7 @@ const HTMLPreview = ({ html, css, filterCss, data }) => {
   };
 
   return (
-    <Box sx={{ border: '1px solid #ddd', p: 2, borderRadius: 2, ml: 4, flex: 1 }}>
+    <Box sx={{ border: '1px solid #ddd', p: 2, borderRadius: 2, width: '100%', boxSizing: 'border-box' }}>
       <Typography variant="h6" gutterBottom>プレビュー</Typography>
       <Box dangerouslySetInnerHTML={{ __html: renderHTML(html, data, css, filterCss) }} />
     </Box>
