@@ -121,20 +121,24 @@ const FILTER_CSS_TEMPLATE = `/* === Filter CSS Template (matches default front-e
 }
 
 .reactdb-tabbed-output .reactdb-output-items {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   align-items: stretch;
+  justify-content: flex-start;
   gap: 1rem;
   width: 100%;
-  column-count: 1;
-  column-gap: 0;
 }
 
 .reactdb-tabbed-output .reactdb-output-items .reactdb-item {
   display: block;
-  width: 100%;
-  grid-column: 1 / -1;
+  flex: 0 1 auto;
+  max-width: 100%;
   break-inside: avoid;
+}
+
+.reactdb-tabbed-output .reactdb-output-items .reactdb-default-row {
+  width: 100%;
+  flex: 1 1 100%;
 }
 
 .reactdb-tabbed-output .reactdb-default-row {
