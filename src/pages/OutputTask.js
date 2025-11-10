@@ -484,7 +484,9 @@ const OutputTask = () => {
             flexDirection: 'column',
             maxWidth: 720,
             gap: 2,
-            flex: '1 1 0'
+            flex: { xs: '1 1 auto', md: '0 1 720px' },
+            minWidth: { md: 0 },
+            width: '100%'
           }}
         >
           <TextField
@@ -734,9 +736,9 @@ const OutputTask = () => {
         {config.format === 'html' && (
           <Box
             sx={{
-              flex: { xs: '1 1 auto', md: '0 0 360px' },
-              width: { xs: '100%', md: 360 },
-              maxWidth: { xs: '100%', md: 420 },
+              flex: { xs: '1 1 auto', md: '1 1 0' },
+              minWidth: { md: 0 },
+              width: '100%',
               position: { md: 'sticky' },
               top: { md: 16 },
               alignSelf: { md: 'flex-start' },
