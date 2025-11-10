@@ -425,31 +425,36 @@ class OutputHandler {
 
         if ($interactive) {
             echo '<div class="reactdb-tabbed-output" data-reactdb-tabbed-output="1" id="' . esc_attr($containerId) . '" data-reactdb-task="' . esc_attr($task) . '">';
-            if ($hasSearch) {
-                echo '<div class="reactdb-search"><label class="reactdb-search-label" for="' . esc_attr($containerId) . '-search">';
-                echo '<span class="reactdb-search-title">キーワード検索</span>';
-                echo '<input type="search" class="reactdb-search-input" id="' . esc_attr($containerId) . '-search" placeholder="キーワードで絞り込み" />';
-                echo '</label></div>';
-            }
-            foreach ($filters as $filter) {
-                if (!isset($filter['key']) || $filter['key'] === '') {
-                    continue;
+            if ($hasSearch || $hasFilters) {
+                echo '<div class="reactdb-tabbed-controls">';
+                if ($hasSearch) {
+                    echo '<div class="reactdb-search"><label class="reactdb-search-label" for="' . esc_attr($containerId) . '-search">';
+                    echo '<span class="reactdb-search-title">キーワード検索</span>';
+                    echo '<input type="search" class="reactdb-search-input" id="' . esc_attr($containerId) . '-search" placeholder="キーワードで絞り込み" />';
+                    echo '</label></div>';
                 }
-                $options = isset($filter['options']) && is_array($filter['options']) ? $filter['options'] : [];
-                echo '<div class="reactdb-tab-group reactdb-tab-group-' . esc_attr($filter['key']) . '" data-filter="' . esc_attr($filter['key']) . '">';
-                echo '<div class="reactdb-tab-title">' . esc_html($filter['label']) . '</div>';
-                echo '<div class="reactdb-tab-list">';
-                echo '<button type="button" class="reactdb-tab-button is-active" data-value="" data-default="1">すべて</button>';
-                foreach ($options as $option) {
-                    if (!is_array($option) || !isset($option['value'])) {
+                foreach ($filters as $filter) {
+                    if (!isset($filter['key']) || $filter['key'] === '') {
                         continue;
                     }
-                    $label = isset($option['label']) ? $option['label'] : $option['value'];
-                    echo '<button type="button" class="reactdb-tab-button" data-value="' . esc_attr($option['value']) . '">' . esc_html($label) . '</button>';
+                    $options = isset($filter['options']) && is_array($filter['options']) ? $filter['options'] : [];
+                    echo '<div class="reactdb-tab-group reactdb-tab-group-' . esc_attr($filter['key']) . '" data-filter="' . esc_attr($filter['key']) . '">';
+                    echo '<div class="reactdb-tab-title">' . esc_html($filter['label']) . '</div>';
+                    echo '<div class="reactdb-tab-list">';
+                    echo '<button type="button" class="reactdb-tab-button is-active" data-value="" data-default="1">すべて</button>';
+                    foreach ($options as $option) {
+                        if (!is_array($option) || !isset($option['value'])) {
+                            continue;
+                        }
+                        $label = isset($option['label']) ? $option['label'] : $option['value'];
+                        echo '<button type="button" class="reactdb-tab-button" data-value="' . esc_attr($option['value']) . '">' . esc_html($label) . '</button>';
+                    }
+                    echo '</div>';
+                    echo '</div>';
                 }
                 echo '</div>';
-                echo '</div>';
             }
+            echo '<div class="reactdb-tabbed-content">';
             echo '<div class="reactdb-output-items">';
         }
 
@@ -501,6 +506,7 @@ class OutputHandler {
         }
 
         if ($interactive) {
+            echo '</div>';
             echo '</div>';
             echo '</div>';
         }

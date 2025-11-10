@@ -23,6 +23,127 @@ const SORT_OPTIONS = [
   { value: 'none', label: '登録順' }
 ];
 
+const FILTER_CSS_TEMPLATE = `/* === Filter CSS Template (matches default front-end styles) === */
+.reactdb-tabbed-output {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.reactdb-tabbed-output .reactdb-tabbed-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex: 0 0 260px;
+  max-width: min(320px, 100%);
+}
+
+.reactdb-tabbed-output .reactdb-tabbed-content {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+
+.reactdb-tabbed-output .reactdb-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.reactdb-tabbed-output .reactdb-search-label {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.reactdb-tabbed-output .reactdb-search-title {
+  font-weight: 600;
+}
+
+.reactdb-tabbed-output .reactdb-search-input {
+  min-width: 200px;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid #d0d0d0;
+  border-radius: 999px;
+  font-size: 0.95rem;
+}
+
+.reactdb-tabbed-output .reactdb-search-input:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
+}
+
+.reactdb-tabbed-output .reactdb-tabbed-controls .reactdb-tab-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.reactdb-tabbed-output .reactdb-tab-title {
+  font-weight: 600;
+}
+
+.reactdb-tabbed-output .reactdb-tab-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.reactdb-tabbed-output .reactdb-tab-button {
+  border: 1px solid #d0d0d0;
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  background: #f5f5f5;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.reactdb-tabbed-output .reactdb-tab-button:hover {
+  background: #e0e0e0;
+}
+
+.reactdb-tabbed-output .reactdb-tab-button.is-active {
+  background: #1976d2;
+  color: #fff;
+  border-color: #1976d2;
+}
+
+.reactdb-tabbed-output .reactdb-tabbed-content .reactdb-output-items {
+  display: grid;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.reactdb-tabbed-output .reactdb-default-row {
+  padding: 0.75rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 0.5rem;
+  background: #fff;
+}
+
+@media (max-width: 768px) {
+  .reactdb-tabbed-output {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .reactdb-tabbed-output .reactdb-tabbed-controls,
+  .reactdb-tabbed-output .reactdb-tabbed-content {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+
+  .reactdb-tabbed-output .reactdb-search-input {
+    min-width: 0;
+    width: 100%;
+  }
+}`;
+
 const FILTER_DEFAULTS = {
   label: '',
   column: '',
@@ -105,18 +226,19 @@ const serializeFilters = filters => (Array.isArray(filters) ? filters : []).map(
 const OutputTask = () => {
   const { task } = useParams();
   const [settings, setSettings] = useState({});
-  const [config, setConfig] = useState({ table: '', format: 'html', html: '', css: '', filterCss: '', filters: [], search: { enabled: false, columns: [] } });
+  const [config, setConfig] = useState({ table: '', format: 'html', html: '', css: '', filterCss: FILTER_CSS_TEMPLATE, filters: [], search: { enabled: false, columns: [] } });
   const [tables, setTables] = useState([]);
   const [columns, setColumns] = useState([]);
   const [sampleRow, setSampleRow] = useState(null);
   const applySettingsToConfig = useCallback((map) => {
     const entry = map && map[task] ? map[task] : {};
+    const existingFilterCss = typeof entry.filterCss === 'string' ? entry.filterCss : '';
     setConfig({
       table: entry.table || '',
       format: entry.format || 'html',
       html: entry.html || '',
       css: entry.css || '',
-      filterCss: typeof entry.filterCss === 'string' ? entry.filterCss : '',
+      filterCss: existingFilterCss && existingFilterCss.trim() ? existingFilterCss : FILTER_CSS_TEMPLATE,
       filters: normalizeFilters(entry.filters, entry.dateField, entry.categoryField),
       search: {
         enabled: !!(entry.search && (entry.search.enabled || entry.search === true)),

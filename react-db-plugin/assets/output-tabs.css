@@ -1,13 +1,26 @@
 .reactdb-tabbed-output {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1.5rem;
   width: 100%;
   max-width: 100%;
 }
 
-.reactdb-tabbed-output .reactdb-tab-group {
+.reactdb-tabbed-output .reactdb-tabbed-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex: 0 0 260px;
+  max-width: min(320px, 100%);
+}
+
+.reactdb-tabbed-output .reactdb-tabbed-content {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+
+.reactdb-tabbed-output .reactdb-tabbed-controls .reactdb-tab-group {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
@@ -75,7 +88,7 @@
   border-color: #1976d2;
 }
 
-.reactdb-tabbed-output .reactdb-output-items {
+.reactdb-tabbed-output .reactdb-tabbed-content .reactdb-output-items {
   display: grid;
   gap: 0.75rem;
   width: 100%;
@@ -86,4 +99,22 @@
   border: 1px solid #e0e0e0;
   border-radius: 0.5rem;
   background: #fff;
+}
+
+@media (max-width: 768px) {
+  .reactdb-tabbed-output {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .reactdb-tabbed-output .reactdb-tabbed-controls,
+  .reactdb-tabbed-output .reactdb-tabbed-content {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+
+  .reactdb-tabbed-output .reactdb-search-input {
+    min-width: 0;
+    width: 100%;
+  }
 }
