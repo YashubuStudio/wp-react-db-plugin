@@ -102,7 +102,7 @@ const serializeFilters = filters => (Array.isArray(filters) ? filters : []).map(
 const OutputTask = () => {
   const { task } = useParams();
   const [settings, setSettings] = useState({});
-  const [config, setConfig] = useState({ table: '', format: 'html', html: '', css: '', filters: [] });
+  const [config, setConfig] = useState({ table: '', format: 'html', html: '', css: '', filterCss: '', filters: [] });
   const [tables, setTables] = useState([]);
   const [columns, setColumns] = useState([]);
   const [sampleRow, setSampleRow] = useState(null);
@@ -113,6 +113,7 @@ const OutputTask = () => {
       format: entry.format || 'html',
       html: entry.html || '',
       css: entry.css || '',
+      filterCss: typeof entry.filterCss === 'string' ? entry.filterCss : '',
       filters: normalizeFilters(entry.filters, entry.dateField, entry.categoryField)
     });
   }, [task]);
@@ -299,18 +300,24 @@ const OutputTask = () => {
     <Box>
       <Typography variant="h5" gutterBottom>タスク設定: {task}</Typography>
       <Box sx={{ display: 'flex' }}>
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: 600 }}>
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: 640, gap: 2 }}>
           <TextField
             select
+            fullWidth
             label="テーブル"
             value={config.table}
             onChange={e => setConfig(cfg => ({ ...cfg, table: e.target.value, filters: [] }))}
-            sx={{ mb: 2 }}
           >
             <MenuItem value="">選択</MenuItem>
             {tables.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
           </TextField>
-          <TextField select label="形式" value={config.format} onChange={e => setConfig({ ...config, format: e.target.value })} sx={{ mb: 2 }}>
+          <TextField
+            select
+            fullWidth
+            label="形式"
+            value={config.format}
+            onChange={e => setConfig({ ...config, format: e.target.value })}
+          >
             <MenuItem value="html">HTML</MenuItem>
             <MenuItem value="json">JSON</MenuItem>
           </TextField>
@@ -329,7 +336,7 @@ const OutputTask = () => {
                 テーブルを選択すると利用可能なカラムが表示されます。
               </Typography>
             )}
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 2 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
               {filters.length === 0 && (
                 <Typography variant="body2" color="text.secondary">
                   フィルターは未設定です。「フィルターを追加」を押してタブを作成してください。
@@ -342,10 +349,11 @@ const OutputTask = () => {
                     border: '1px solid',
                     borderColor: 'grey.300',
                     borderRadius: 1,
-                    p: 2,
+                    p: 1.5,
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: 2
+                    gap: 1.5,
+                    width: '100%'
                   }}
                 >
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
@@ -356,19 +364,19 @@ const OutputTask = () => {
                       削除
                     </Button>
                   </Box>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
                     <TextField
                       label="グループ名"
                       value={filter.label}
                       onChange={e => updateFilter(filter.id, { label: e.target.value })}
-                      sx={{ minWidth: 200 }}
+                      sx={{ minWidth: 200, flex: '1 1 200px' }}
                     />
                     <TextField
                       select
                       label="参照カラム"
                       value={filter.column}
                       onChange={e => setFilterColumn(filter.id, e.target.value)}
-                      sx={{ minWidth: 200 }}
+                      sx={{ minWidth: 200, flex: '1 1 200px' }}
                       disabled={columns.length === 0}
                     >
                       <MenuItem value="">未選択</MenuItem>
@@ -381,7 +389,7 @@ const OutputTask = () => {
                       label="参照方法"
                       value={filter.type}
                       onChange={e => setFilterType(filter.id, e.target.value)}
-                      sx={{ minWidth: 200 }}
+                      sx={{ minWidth: 200, flex: '1 1 200px' }}
                     >
                       {FILTER_TYPES.map(option => (
                         <MenuItem key={`${filter.id}-type-${option.value}`} value={option.value}>{option.label}</MenuItem>
@@ -423,7 +431,7 @@ const OutputTask = () => {
                   </TextField>
                 </Box>
               ))}
-              <Box>
+              <Box sx={{ pt: 0.5 }}>
                 <Button variant="outlined" onClick={addFilter} disabled={!config.table || columns.length === 0}>
                   フィルターを追加
                 </Button>
@@ -433,8 +441,28 @@ const OutputTask = () => {
         )}
         {config.format === 'html' && (
           <>
-            <TextField label="CSS" multiline minRows={4} value={config.css} onChange={e => setConfig({ ...config, css: e.target.value })} sx={{ mb: 2 }} />
-            <TextField label="HTML" multiline minRows={4} value={config.html} onChange={e => setConfig({ ...config, html: e.target.value })} sx={{ mb: 2 }} />
+            <TextField
+              label="フィルターCSS"
+              multiline
+              minRows={3}
+              value={config.filterCss}
+              onChange={e => setConfig({ ...config, filterCss: e.target.value })}
+              helperText="フィルター表示をカスタマイズする CSS を入力できます。"
+            />
+            <TextField
+              label="CSS"
+              multiline
+              minRows={4}
+              value={config.css}
+              onChange={e => setConfig({ ...config, css: e.target.value })}
+            />
+            <TextField
+              label="HTML"
+              multiline
+              minRows={4}
+              value={config.html}
+              onChange={e => setConfig({ ...config, html: e.target.value })}
+            />
             <Typography variant="body1" sx={{ mb: 2, fontSize: '1rem' }}>
               ショートコード: [reactdb_output task="{task}"]
             </Typography>
@@ -449,7 +477,7 @@ const OutputTask = () => {
         </Box>
         </Box>
         {config.format === 'html' && (
-          <HTMLPreview html={config.html} css={config.css} data={previewData} />
+          <HTMLPreview html={config.html} css={config.css} filterCss={config.filterCss} data={previewData} />
         )}
       </Box>
     </Box>
