@@ -24,6 +24,11 @@ class OutputHandler {
             } elseif (!isset($settings[$task]['css'])) {
                 $settings[$task]['css'] = '';
             }
+            if (isset($conf['filterCss'])) {
+                $settings[$task]['filterCss'] = wp_strip_all_tags(is_string($conf['filterCss']) ? $conf['filterCss'] : '');
+            } elseif (!isset($settings[$task]['filterCss'])) {
+                $settings[$task]['filterCss'] = '';
+            }
             if (isset($conf['dateField'])) {
                 $settings[$task]['dateField'] = sanitize_text_field($conf['dateField']);
             } elseif (!isset($settings[$task]['dateField'])) {
@@ -318,8 +323,13 @@ class OutputHandler {
             wp_enqueue_style('reactdb-output-tabs', $css_url, [], $css_version);
             wp_enqueue_script('reactdb-output-tabs', $js_url, [], $js_version, true);
         }
+        $filterCss = !empty($config['filterCss']) ? trim($config['filterCss']) : '';
+
         if ($css !== '') {
             echo '<style>' . $css . '</style>';
+        }
+        if ($hasFilters && $filterCss !== '') {
+            echo '<style>' . $filterCss . '</style>';
         }
 
         if ($hasFilters) {
