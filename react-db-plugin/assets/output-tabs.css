@@ -13,6 +13,38 @@
   gap: 0.2rem;
 }
 
+.reactdb-tabbed-output .reactdb-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.reactdb-tabbed-output .reactdb-search-label {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.reactdb-tabbed-output .reactdb-search-title {
+  font-weight: 600;
+}
+
+.reactdb-tabbed-output .reactdb-search-input {
+  min-width: 200px;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid #d0d0d0;
+  border-radius: 999px;
+  font-size: 0.95rem;
+}
+
+.reactdb-tabbed-output .reactdb-search-input:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
+}
+
 .reactdb-tabbed-output .reactdb-tab-title {
   font-weight: 600;
 }

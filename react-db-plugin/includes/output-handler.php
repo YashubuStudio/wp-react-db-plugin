@@ -83,6 +83,32 @@ class OutputHandler {
             } elseif (!isset($settings[$task]['filters'])) {
                 $settings[$task]['filters'] = [];
             }
+            if (isset($conf['search']) && is_array($conf['search'])) {
+                $enabled = !empty($conf['search']['enabled']);
+                $columns = [];
+                if (!empty($conf['search']['columns']) && is_array($conf['search']['columns'])) {
+                    foreach ($conf['search']['columns'] as $column) {
+                        if (!is_string($column)) {
+                            continue;
+                        }
+                        $column = sanitize_text_field($column);
+                        if ($column === '') {
+                            continue;
+                        }
+                        $columns[$column] = true;
+                    }
+                }
+                $columns = array_keys($columns);
+                $settings[$task]['search'] = [
+                    'enabled' => $enabled && !empty($columns),
+                    'columns' => $columns,
+                ];
+            } elseif (!isset($settings[$task]['search'])) {
+                $settings[$task]['search'] = [
+                    'enabled' => false,
+                    'columns' => [],
+                ];
+            }
         }
         update_option('reactdb_output_settings', $settings);
     }
@@ -264,6 +290,68 @@ class OutputHandler {
         return implode('', $parts);
     }
 
+    private static function build_search_attribute($row, $columns) {
+        if (!is_array($row) || !is_array($columns) || empty($columns)) {
+            return '';
+        }
+        $pieces = [];
+        foreach ($columns as $column) {
+            if (!is_string($column) || $column === '') {
+                continue;
+            }
+            if (!array_key_exists($column, $row)) {
+                continue;
+            }
+            $value = $row[$column];
+            if (is_array($value)) {
+                $value = join(' ', array_map('strval', $value));
+            }
+            $text = wp_strip_all_tags((string) $value);
+            if ($text === '') {
+                continue;
+            }
+            $pieces[] = preg_replace('/\s+/u', ' ', $text);
+        }
+        if (empty($pieces)) {
+            return '';
+        }
+        $joined = join(' ', $pieces);
+        $content = function_exists('mb_strtolower') ? mb_strtolower($joined, 'UTF-8') : strtolower($joined);
+        return ' data-search-index="' . esc_attr($content) . '"';
+    }
+
+    private static function get_search_config($config) {
+        if (!is_array($config) || empty($config['search']) || !is_array($config['search'])) {
+            return [
+                'enabled' => false,
+                'columns' => [],
+            ];
+        }
+        $search = $config['search'];
+        $enabled = !empty($search['enabled']);
+        $columns = [];
+        if (!empty($search['columns']) && is_array($search['columns'])) {
+            foreach ($search['columns'] as $column) {
+                if (!is_string($column)) {
+                    continue;
+                }
+                $column = sanitize_text_field($column);
+                if ($column === '') {
+                    continue;
+                }
+                $columns[$column] = true;
+            }
+        }
+        $columns = array_keys($columns);
+        if (empty($columns)) {
+            $enabled = false;
+        }
+        return [
+            'enabled' => $enabled,
+            'columns' => $columns,
+        ];
+    }
+
     public static function render_html($task) {
         $config = self::get_task($task);
         if (!$config) {
@@ -274,6 +362,8 @@ class OutputHandler {
             return '<div>No data</div>';
         }
         $css = !empty($config['css']) ? trim($config['css']) : '';
+        $search = self::get_search_config($config);
+        $hasSearch = $search['enabled'] && !empty($search['columns']);
         $rawFilters = [];
         if (isset($config['filters']) && is_array($config['filters'])) {
             $rawFilters = $config['filters'];
@@ -308,6 +398,7 @@ class OutputHandler {
         }
         $filters = self::build_filters($rawFilters, $rows);
         $hasFilters = !empty($filters);
+        $interactive = $hasFilters || $hasSearch;
         $containerId = 'reactdb-output-' . uniqid();
         $asset_dir = plugin_dir_path(__FILE__) . '../assets/';
         $plugin_file = dirname(__DIR__) . '/react-db-plugin.php';
@@ -317,7 +408,7 @@ class OutputHandler {
         $js_version = file_exists($js_path) ? filemtime($js_path) : false;
 
         ob_start();
-        if ($hasFilters) {
+        if ($interactive) {
             $css_url = plugins_url('assets/output-tabs.css', $plugin_file);
             $js_url = plugins_url('assets/output-tabs.js', $plugin_file);
             wp_enqueue_style('reactdb-output-tabs', $css_url, [], $css_version);
@@ -328,12 +419,18 @@ class OutputHandler {
         if ($css !== '') {
             echo '<style>' . $css . '</style>';
         }
-        if ($hasFilters && $filterCss !== '') {
+        if ($interactive && $filterCss !== '') {
             echo '<style>' . $filterCss . '</style>';
         }
 
-        if ($hasFilters) {
+        if ($interactive) {
             echo '<div class="reactdb-tabbed-output" data-reactdb-tabbed-output="1" id="' . esc_attr($containerId) . '" data-reactdb-task="' . esc_attr($task) . '">';
+            if ($hasSearch) {
+                echo '<div class="reactdb-search"><label class="reactdb-search-label" for="' . esc_attr($containerId) . '-search">';
+                echo '<span class="reactdb-search-title">キーワード検索</span>';
+                echo '<input type="search" class="reactdb-search-input" id="' . esc_attr($containerId) . '-search" placeholder="キーワードで絞り込み" />';
+                echo '</label></div>';
+            }
             foreach ($filters as $filter) {
                 if (!isset($filter['key']) || $filter['key'] === '') {
                     continue;
@@ -365,21 +462,33 @@ class OutputHandler {
                 foreach ($row as $k => $v) {
                     $html = str_replace('{{' . $k . '}}', esc_html($v), $html);
                 }
-                if ($hasFilters) {
-                    $attributes = self::build_item_attributes($row, $filters);
+                if ($interactive) {
+                    $attributes = '';
+                    if ($hasFilters) {
+                        $attributes .= self::build_item_attributes($row, $filters);
+                    }
+                    if ($hasSearch) {
+                        $attributes .= self::build_search_attribute($row, $search['columns']);
+                    }
                     echo '<div class="reactdb-item"' . $attributes . '>' . $html . '</div>';
                 } else {
                     echo $html;
                 }
             }
         } else {
-            if ($hasFilters) {
+            if ($interactive) {
                 foreach ($rows as $row) {
                     if (!is_array($row)) {
                         continue;
                     }
                     $content = '<div class="reactdb-default-row">' . esc_html(join(' | ', $row)) . '</div>';
-                    $attributes = self::build_item_attributes($row, $filters);
+                    $attributes = '';
+                    if ($hasFilters) {
+                        $attributes .= self::build_item_attributes($row, $filters);
+                    }
+                    if ($hasSearch) {
+                        $attributes .= self::build_search_attribute($row, $search['columns']);
+                    }
                     echo '<div class="reactdb-item"' . $attributes . '>' . $content . '</div>';
                 }
             } else {
@@ -391,7 +500,7 @@ class OutputHandler {
             }
         }
 
-        if ($hasFilters) {
+        if ($interactive) {
             echo '</div>';
             echo '</div>';
         }
