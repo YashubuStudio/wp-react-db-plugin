@@ -123,7 +123,13 @@ const FILTER_CSS_TEMPLATE = `/* === Filter CSS Template (matches default front-e
 .reactdb-tabbed-output .reactdb-output-items {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 1rem;
+  width: 100%;
+}
+
+.reactdb-tabbed-output .reactdb-output-items .reactdb-item {
+  display: block;
   width: 100%;
 }
 

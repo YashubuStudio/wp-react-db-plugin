@@ -98,7 +98,13 @@
 .reactdb-tabbed-output .reactdb-output-items {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 1rem;
+  width: 100%;
+}
+
+.reactdb-tabbed-output .reactdb-output-items .reactdb-item {
+  display: block;
   width: 100%;
 }
 
