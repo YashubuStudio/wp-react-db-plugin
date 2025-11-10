@@ -470,8 +470,25 @@ const OutputTask = () => {
   return (
     <Box>
       <Typography variant="h5" gutterBottom>タスク設定: {task}</Typography>
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', maxWidth: 720, gap: 2 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
+          alignItems: 'flex-start',
+          gap: { xs: 3, md: 4 }
+        }}
+      >
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            maxWidth: 720,
+            gap: 2,
+            flex: { xs: '1 1 auto', md: '0 1 720px' },
+            minWidth: { md: 0 },
+            width: '100%'
+          }}
+        >
           <TextField
             select
             fullWidth
@@ -717,7 +734,20 @@ const OutputTask = () => {
         </Box>
         </Box>
         {config.format === 'html' && (
-          <HTMLPreview html={config.html} css={config.css} filterCss={config.filterCss} data={previewData} />
+          <Box
+            sx={{
+              flex: { xs: '1 1 auto', md: '1 1 0' },
+              minWidth: { md: 0 },
+              width: '100%',
+              position: { md: 'sticky' },
+              top: { md: 16 },
+              alignSelf: { md: 'flex-start' },
+              maxHeight: { md: 'calc(100vh - 48px)' },
+              overflow: { md: 'auto' }
+            }}
+          >
+            <HTMLPreview html={config.html} css={config.css} filterCss={config.filterCss} data={previewData} />
+          </Box>
         )}
       </Box>
     </Box>
