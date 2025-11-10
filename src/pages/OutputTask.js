@@ -121,7 +121,8 @@ const FILTER_CSS_TEMPLATE = `/* === Filter CSS Template (matches default front-e
 }
 
 .reactdb-tabbed-output .reactdb-output-items {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
   width: 100%;
 }
@@ -133,11 +134,6 @@ const FILTER_CSS_TEMPLATE = `/* === Filter CSS Template (matches default front-e
   background: #fff;
 }
 
-@media (min-width: 768px) {
-  .reactdb-tabbed-output .reactdb-output-items {
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  }
-}
 `;
 
 const FILTER_DEFAULTS = {
