@@ -30,7 +30,7 @@ React UI はヘッダー、サイドバー、複数のツールで構成され�
 - **DB 登録** – テーブル名とカラム定義、デフォルト値、`created_at`/`updated_at` の自動追加などを設定して新規テーブルを作成します。
 - **データベース一覧** – 既存テーブルの閲覧、コピー、削除、行の表示・編集ができます。`logs` など保護されたテーブルは削除できません。
 - **操作ログ** – `wp_reactdb_logs` に記録された最近の操作を確認できます。ユーザー ID や説明が保存されています。
-- **出力設定** – テーブルデータを JSON または HTML として出力するタスクを定義します。HTML スニペットでは `{{column}}` プレースホルダーを利用でき、`[reactdb_output task="taskName"]` で表示可能です。
+- **出力設定** – テーブルデータを JSON または HTML として出力するタスクを定義します。HTML スニペットでは `{{column}}` プレースホルダーを利用でき、`[reactdb_output task="taskName"]` で表示可能です。HTML 形式の場合は表示に使いたい「日付カラム」と「カテゴリカラム」を選択でき、前者は日付タブ、後者はカテゴリタブとしてショートコード出力に反映されます。
 
 ## テーブル編集
 
@@ -46,6 +46,33 @@ React UI はヘッダー、サイドバー、複数のツールで構成され�
 - HTML 形式: `[reactdb_output task="<task>"]`
 
 これらのエンドポイントは対象テーブルの全行を返します。HTML 形式では保存されたスニペットをもとにリストが生成されます。タスクの設定は WordPress オプション `reactdb_output_settings` に保存されています。
+
+## タブフィルター付きショートコードの使い方
+
+HTML 出力タスクで「日付カラム」または「カテゴリカラム」を指定すると、ショートコードの表示にタブ UI が自動で追加され、選択した値に応じて行を絞り込み表示できます。
+
+1. **出力設定 → タスク編集** で対象テーブルを選び、フォーマットに「HTML」を指定します。
+2. サンプル行の下に表示される「日付カラム」と「カテゴリカラム」のプルダウンから絞り込みに使用したい列を選択します（どちらか片方だけでも構いません）。
+3. 必要に応じて HTML テンプレートや CSS を調整し、「保存」します。
+4. フロントエンドでは `[reactdb_output task="<task>"]` を挿入すると、選択した列のユニーク値をもとにタブボタンが生成されます。「すべて」をクリックすると絞り込みが解除されます。
+
+タブ UI のスタイルは `react-db-plugin/assets/output-tabs.css` に定義されています。上書きしたい場合はテーマやカスタマイザーに任意の CSS を追加してください。JavaScript の挙動は `react-db-plugin/assets/output-tabs.js` に実装されており、ページ読込後に自動実行されます。新しいコンテンツを Ajax などで追加した際は、以下のように公開されているグローバル API を使って再初期化できます。
+
+```html
+<script>
+  fetch('/wp-json/reactdb/v1/output/events')
+    .then(response => response.text())
+    .then(html => {
+      const container = document.querySelector('#event-output');
+      container.innerHTML = html;
+      if (window.ReactDBOutputTabs) {
+        window.ReactDBOutputTabs.init();
+      }
+    });
+</script>
+```
+
+個別の要素に対して初期化したい場合は `window.ReactDBOutputTabs.setup(element)` を、監視を有効化したい場合は `window.ReactDBOutputTabs.observe()` を利用できます。監視は MutationObserver を利用しており、DOM にタブ UI が追加されるたびに自動で初期化されます。
 
 ## その他のショートコード
 

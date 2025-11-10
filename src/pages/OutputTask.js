@@ -11,7 +11,7 @@ import HTMLPreview from '../components/HTMLPreview';
 const OutputTask = () => {
   const { task } = useParams();
   const [settings, setSettings] = useState({});
-  const [config, setConfig] = useState({ table: '', format: 'html', html: '', css: '' });
+  const [config, setConfig] = useState({ table: '', format: 'html', html: '', css: '', dateField: '', categoryField: '' });
   const [tables, setTables] = useState([]);
   const [columns, setColumns] = useState([]);
   const [sampleRow, setSampleRow] = useState(null);
@@ -74,7 +74,9 @@ const OutputTask = () => {
             table: c.table || '',
             format: c.format || 'html',
             html: c.html || '',
-            css: c.css || ''
+            css: c.css || '',
+            dateField: c.dateField || '',
+            categoryField: c.categoryField || ''
           });
         });
       fetch(apiEndpoint('tables'), {
@@ -133,7 +135,7 @@ const OutputTask = () => {
       <Typography variant="h5" gutterBottom>タスク設定: {task}</Typography>
       <Box sx={{ display: 'flex' }}>
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: 600 }}>
-          <TextField select label="テーブル" value={config.table} onChange={e => setConfig({ ...config, table: e.target.value })} sx={{ mb: 2 }}>
+          <TextField select label="テーブル" value={config.table} onChange={e => setConfig({ ...config, table: e.target.value, dateField: '', categoryField: '' })} sx={{ mb: 2 }}>
             <MenuItem value="">選択</MenuItem>
             {tables.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
           </TextField>
@@ -142,13 +144,41 @@ const OutputTask = () => {
             <MenuItem value="json">JSON</MenuItem>
           </TextField>
         {config.format === 'html' && columns.length > 0 && (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
-            {columns.map(c => (
-              <Box key={c} sx={{ px: 1, py: 0.5, border: '1px solid', borderColor: 'grey.400', borderRadius: 1 }}>
-                {c}
-              </Box>
-            ))}
-          </Box>
+          <>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+              {columns.map(c => (
+                <Box key={c} sx={{ px: 1, py: 0.5, border: '1px solid', borderColor: 'grey.400', borderRadius: 1 }}>
+                  {c}
+                </Box>
+              ))}
+            </Box>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+              <TextField
+                select
+                label="日付カラム"
+                value={config.dateField || ''}
+                onChange={e => setConfig({ ...config, dateField: e.target.value })}
+                sx={{ minWidth: 200 }}
+              >
+                <MenuItem value="">未選択</MenuItem>
+                {columns.map(c => (
+                  <MenuItem key={`date-${c}`} value={c}>{c}</MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                select
+                label="カテゴリカラム"
+                value={config.categoryField || ''}
+                onChange={e => setConfig({ ...config, categoryField: e.target.value })}
+                sx={{ minWidth: 200 }}
+              >
+                <MenuItem value="">未選択</MenuItem>
+                {columns.map(c => (
+                  <MenuItem key={`cat-${c}`} value={c}>{c}</MenuItem>
+                ))}
+              </TextField>
+            </Box>
+          </>
         )}
         {config.format === 'html' && (
           <>
