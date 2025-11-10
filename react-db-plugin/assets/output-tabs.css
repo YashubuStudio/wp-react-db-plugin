@@ -1,0 +1,53 @@
+.reactdb-tabbed-output {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.reactdb-tabbed-output .reactdb-tab-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.reactdb-tabbed-output .reactdb-tab-title {
+  font-weight: 600;
+}
+
+.reactdb-tabbed-output .reactdb-tab-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.reactdb-tabbed-output .reactdb-tab-button {
+  border: 1px solid #d0d0d0;
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  background: #f5f5f5;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.reactdb-tabbed-output .reactdb-tab-button:hover {
+  background: #e0e0e0;
+}
+
+.reactdb-tabbed-output .reactdb-tab-button.is-active {
+  background: #1976d2;
+  color: #fff;
+  border-color: #1976d2;
+}
+
+.reactdb-tabbed-output .reactdb-output-items {
+  display: grid;
+  gap: 1rem;
+}
+
+.reactdb-tabbed-output .reactdb-default-row {
+  padding: 0.75rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 0.5rem;
+  background: #fff;
+}
