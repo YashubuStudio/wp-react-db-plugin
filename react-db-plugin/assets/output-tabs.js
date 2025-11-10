@@ -1,6 +1,22 @@
 (function () {
+  var MULTI_SEPARATOR = '|~|';
+
   function toArray(list) {
     return Array.prototype.slice.call(list || []);
+  }
+
+  function parseAttributeValues(attr) {
+    if (!attr) {
+      return [];
+    }
+    var values = attr.indexOf(MULTI_SEPARATOR) === -1 ? [attr] : attr.split(MULTI_SEPARATOR);
+    return values
+      .map(function (value) {
+        return typeof value === 'string' ? value.trim() : '';
+      })
+      .filter(function (value) {
+        return value !== '';
+      });
   }
 
   function applyFilters(container, filters) {
@@ -12,8 +28,16 @@
         if (!value) {
           return;
         }
-        var attr = item.getAttribute('data-' + key) || '';
-        if (attr !== value) {
+        var attr = item.getAttribute('data-filter-' + key) || '';
+        var candidates = parseAttributeValues(attr);
+        if (candidates.length === 0) {
+          visible = false;
+          return;
+        }
+        var matched = candidates.some(function (candidate) {
+          return candidate === value;
+        });
+        if (!matched) {
           visible = false;
         }
       });

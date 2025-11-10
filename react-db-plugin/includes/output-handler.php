@@ -1,5 +1,6 @@
 <?php
 class OutputHandler {
+    private const FILTER_MULTI_SEPARATOR = '|~|';
     public static function get_settings() {
         $settings = get_option('reactdb_output_settings', []);
         return is_array($settings) ? $settings : [];
@@ -33,6 +34,50 @@ class OutputHandler {
             } elseif (!isset($settings[$task]['categoryField'])) {
                 $settings[$task]['categoryField'] = '';
             }
+            if (isset($conf['filters']) && is_array($conf['filters'])) {
+                $filters = [];
+                foreach ($conf['filters'] as $filter) {
+                    if (!is_array($filter)) {
+                        continue;
+                    }
+                    $column = isset($filter['column']) ? sanitize_text_field($filter['column']) : '';
+                    $id = isset($filter['id']) ? sanitize_key($filter['id']) : '';
+                    if ($id === '' && $column !== '') {
+                        $id = sanitize_key($column);
+                    }
+                    if ($id === '') {
+                        $id = 'filter_' . (count($filters) + 1);
+                    }
+                    $label = isset($filter['label']) ? sanitize_text_field($filter['label']) : '';
+                    if ($label === '' && $column !== '') {
+                        $label = $column;
+                    }
+                    $type = isset($filter['type']) && in_array($filter['type'], ['text', 'date', 'list'], true)
+                        ? $filter['type']
+                        : 'text';
+                    $dateFormat = isset($filter['dateFormat']) ? sanitize_text_field($filter['dateFormat']) : 'Y-m-d';
+                    $delimiter = isset($filter['delimiter']) && $filter['delimiter'] !== ''
+                        ? sanitize_text_field($filter['delimiter'])
+                        : ',';
+                    $sort = isset($filter['sort']) && in_array($filter['sort'], ['asc', 'desc', 'none'], true)
+                        ? $filter['sort']
+                        : 'asc';
+                    $labelTemplate = isset($filter['labelTemplate']) ? sanitize_text_field($filter['labelTemplate']) : '';
+                    $filters[] = [
+                        'id' => $id,
+                        'label' => $label,
+                        'column' => $column,
+                        'type' => $type,
+                        'dateFormat' => $dateFormat,
+                        'delimiter' => $delimiter,
+                        'sort' => $sort,
+                        'labelTemplate' => $labelTemplate,
+                    ];
+                }
+                $settings[$task]['filters'] = $filters;
+            } elseif (!isset($settings[$task]['filters'])) {
+                $settings[$task]['filters'] = [];
+            }
         }
         update_option('reactdb_output_settings', $settings);
     }
@@ -46,6 +91,174 @@ class OutputHandler {
         return $wpdb->get_results("SELECT * FROM $table", ARRAY_A);
     }
 
+    private static function get_filter_values($rawValue, $type, $dateFormat, $delimiter) {
+        $values = [];
+        if (is_array($rawValue)) {
+            return $values;
+        }
+        $stringValue = trim((string) $rawValue);
+        if ($stringValue === '') {
+            return $values;
+        }
+        if ($type === 'list') {
+            $separator = $delimiter !== '' ? $delimiter : ',';
+            $parts = explode($separator, $stringValue);
+            $unique = [];
+            foreach ($parts as $part) {
+                $part = trim($part);
+                if ($part === '') {
+                    continue;
+                }
+                $unique[$part] = true;
+            }
+            return array_keys($unique);
+        }
+        if ($type === 'date') {
+            $timestamp = strtotime($stringValue);
+            if ($timestamp !== false && $timestamp !== -1) {
+                $format = $dateFormat !== '' ? $dateFormat : 'Y-m-d';
+                $values[] = date_i18n($format, $timestamp);
+            }
+            return $values;
+        }
+        $values[] = $stringValue;
+        return $values;
+    }
+
+    private static function sort_filter_values($values, $direction) {
+        if (!is_array($values)) {
+            return [];
+        }
+        $normalized = [];
+        foreach ($values as $value) {
+            $value = (string) $value;
+            if ($value === '') {
+                continue;
+            }
+            $normalized[] = $value;
+        }
+        if ($direction === 'none') {
+            return $normalized;
+        }
+        $sorted = $normalized;
+        natcasesort($sorted);
+        $sorted = array_values($sorted);
+        if ($direction === 'desc') {
+            $sorted = array_reverse($sorted);
+        }
+        return $sorted;
+    }
+
+    private static function build_filters($rawFilters, $rows) {
+        if (!is_array($rawFilters) || empty($rawFilters)) {
+            return [];
+        }
+        $prepared = [];
+        $index = 0;
+        foreach ($rawFilters as $filter) {
+            if (!is_array($filter)) {
+                continue;
+            }
+            $column = isset($filter['column']) ? (string) $filter['column'] : '';
+            $key = isset($filter['id']) ? sanitize_key($filter['id']) : '';
+            if ($key === '' && $column !== '') {
+                $key = sanitize_key($column);
+            }
+            if ($key === '') {
+                $key = 'filter_' . ($index + 1);
+            }
+            $label = isset($filter['label']) ? (string) $filter['label'] : '';
+            if ($label === '') {
+                $label = $column !== '' ? $column : sprintf('フィルター%d', $index + 1);
+            }
+            $type = isset($filter['type']) ? (string) $filter['type'] : 'text';
+            if (!in_array($type, ['text', 'date', 'list'], true)) {
+                $type = 'text';
+            }
+            $dateFormat = isset($filter['dateFormat']) && $filter['dateFormat'] !== '' ? (string) $filter['dateFormat'] : 'Y-m-d';
+            $delimiter = isset($filter['delimiter']) && $filter['delimiter'] !== '' ? (string) $filter['delimiter'] : ',';
+            $sort = isset($filter['sort']) ? (string) $filter['sort'] : 'asc';
+            if (!in_array($sort, ['asc', 'desc', 'none'], true)) {
+                $sort = 'asc';
+            }
+            $labelTemplate = isset($filter['labelTemplate']) ? (string) $filter['labelTemplate'] : '';
+            $valueSet = [];
+            if ($column !== '') {
+                foreach ($rows as $row) {
+                    if (!is_array($row) || !array_key_exists($column, $row)) {
+                        continue;
+                    }
+                    $rawValue = $row[$column];
+                    $values = self::get_filter_values($rawValue, $type, $dateFormat, $delimiter);
+                    foreach ($values as $value) {
+                        $value = (string) $value;
+                        if ($value === '') {
+                            continue;
+                        }
+                        $valueSet[$value] = true;
+                    }
+                }
+            }
+            $options = [];
+            $sortedValues = self::sort_filter_values(array_keys($valueSet), $sort);
+            foreach ($sortedValues as $value) {
+                $display = $labelTemplate !== '' ? str_replace('{{value}}', $value, $labelTemplate) : $value;
+                $options[] = [
+                    'value' => $value,
+                    'label' => $display,
+                ];
+            }
+            $prepared[] = [
+                'key' => $key,
+                'label' => $label,
+                'column' => $column,
+                'type' => $type,
+                'dateFormat' => $dateFormat,
+                'delimiter' => $delimiter,
+                'sort' => $sort,
+                'labelTemplate' => $labelTemplate,
+                'options' => $options,
+            ];
+            $index++;
+        }
+        return $prepared;
+    }
+
+    private static function build_item_attributes($row, $filters) {
+        if (!is_array($filters) || empty($filters) || !is_array($row)) {
+            return '';
+        }
+        $parts = [];
+        foreach ($filters as $filter) {
+            if (!isset($filter['key'])) {
+                continue;
+            }
+            $key = $filter['key'];
+            $column = isset($filter['column']) ? $filter['column'] : '';
+            $type = isset($filter['type']) ? $filter['type'] : 'text';
+            $dateFormat = isset($filter['dateFormat']) ? $filter['dateFormat'] : 'Y-m-d';
+            $delimiter = isset($filter['delimiter']) ? $filter['delimiter'] : ',';
+            $values = [];
+            if ($column !== '' && array_key_exists($column, $row)) {
+                $values = self::get_filter_values($row[$column], $type, $dateFormat, $delimiter);
+            }
+            $unique = [];
+            foreach ($values as $value) {
+                $value = trim((string) $value);
+                if ($value === '') {
+                    continue;
+                }
+                $unique[$value] = true;
+            }
+            $attrValue = '';
+            if (!empty($unique)) {
+                $attrValue = implode(self::FILTER_MULTI_SEPARATOR, array_keys($unique));
+            }
+            $parts[] = ' data-filter-' . esc_attr($key) . '="' . esc_attr($attrValue) . '"';
+        }
+        return implode('', $parts);
+    }
+
     public static function render_html($task) {
         $config = self::get_task($task);
         if (!$config) {
@@ -56,40 +269,40 @@ class OutputHandler {
             return '<div>No data</div>';
         }
         $css = !empty($config['css']) ? trim($config['css']) : '';
-        $dateField = isset($config['dateField']) ? $config['dateField'] : '';
-        $categoryField = isset($config['categoryField']) ? $config['categoryField'] : '';
-        $firstRow = isset($rows[0]) && is_array($rows[0]) ? $rows[0] : [];
-        $hasDate = $dateField && array_key_exists($dateField, $firstRow);
-        $hasCategory = $categoryField && array_key_exists($categoryField, $firstRow);
-        $hasFilters = $hasDate || $hasCategory;
-        $dateValues = [];
-        if ($hasDate) {
-            foreach ($rows as $row) {
-                if (!is_array($row) || !array_key_exists($dateField, $row)) {
-                    continue;
-                }
-                $value = (string) $row[$dateField];
-                if ($value === '') {
-                    continue;
-                }
-                $dateValues[$value] = true;
-            }
-            $dateValues = array_keys($dateValues);
+        $rawFilters = [];
+        if (isset($config['filters']) && is_array($config['filters'])) {
+            $rawFilters = $config['filters'];
         }
-        $categoryValues = [];
-        if ($hasCategory) {
-            foreach ($rows as $row) {
-                if (!is_array($row) || !array_key_exists($categoryField, $row)) {
-                    continue;
-                }
-                $value = (string) $row[$categoryField];
-                if ($value === '') {
-                    continue;
-                }
-                $categoryValues[$value] = true;
+        if (empty($rawFilters)) {
+            $dateField = isset($config['dateField']) ? $config['dateField'] : '';
+            if ($dateField !== '') {
+                $rawFilters[] = [
+                    'id' => 'date',
+                    'label' => '日付',
+                    'column' => $dateField,
+                    'type' => 'date',
+                    'dateFormat' => 'Y-m-d',
+                    'delimiter' => ',',
+                    'sort' => 'asc',
+                    'labelTemplate' => '',
+                ];
             }
-            $categoryValues = array_keys($categoryValues);
+            $categoryField = isset($config['categoryField']) ? $config['categoryField'] : '';
+            if ($categoryField !== '') {
+                $rawFilters[] = [
+                    'id' => 'category',
+                    'label' => 'カテゴリ',
+                    'column' => $categoryField,
+                    'type' => 'text',
+                    'dateFormat' => 'Y-m-d',
+                    'delimiter' => ',',
+                    'sort' => 'asc',
+                    'labelTemplate' => '',
+                ];
+            }
         }
+        $filters = self::build_filters($rawFilters, $rows);
+        $hasFilters = !empty($filters);
         $containerId = 'reactdb-output-' . uniqid();
         $asset_dir = plugin_dir_path(__FILE__) . '../assets/';
         $plugin_file = dirname(__DIR__) . '/react-db-plugin.php';
@@ -111,24 +324,21 @@ class OutputHandler {
 
         if ($hasFilters) {
             echo '<div class="reactdb-tabbed-output" data-reactdb-tabbed-output="1" id="' . esc_attr($containerId) . '" data-reactdb-task="' . esc_attr($task) . '">';
-            if ($hasDate) {
-                echo '<div class="reactdb-tab-group reactdb-tab-group-date" data-filter="date">';
-                echo '<div class="reactdb-tab-title">日付</div>';
-                echo '<div class="reactdb-tab-list">';
-                echo '<button type="button" class="reactdb-tab-button is-active" data-value="" data-default="1">すべて</button>';
-                foreach ($dateValues as $value) {
-                    echo '<button type="button" class="reactdb-tab-button" data-value="' . esc_attr($value) . '">' . esc_html($value) . '</button>';
+            foreach ($filters as $filter) {
+                if (!isset($filter['key']) || $filter['key'] === '') {
+                    continue;
                 }
-                echo '</div>';
-                echo '</div>';
-            }
-            if ($hasCategory) {
-                echo '<div class="reactdb-tab-group reactdb-tab-group-category" data-filter="category">';
-                echo '<div class="reactdb-tab-title">カテゴリ</div>';
+                $options = isset($filter['options']) && is_array($filter['options']) ? $filter['options'] : [];
+                echo '<div class="reactdb-tab-group reactdb-tab-group-' . esc_attr($filter['key']) . '" data-filter="' . esc_attr($filter['key']) . '">';
+                echo '<div class="reactdb-tab-title">' . esc_html($filter['label']) . '</div>';
                 echo '<div class="reactdb-tab-list">';
                 echo '<button type="button" class="reactdb-tab-button is-active" data-value="" data-default="1">すべて</button>';
-                foreach ($categoryValues as $value) {
-                    echo '<button type="button" class="reactdb-tab-button" data-value="' . esc_attr($value) . '">' . esc_html($value) . '</button>';
+                foreach ($options as $option) {
+                    if (!is_array($option) || !isset($option['value'])) {
+                        continue;
+                    }
+                    $label = isset($option['label']) ? $option['label'] : $option['value'];
+                    echo '<button type="button" class="reactdb-tab-button" data-value="' . esc_attr($option['value']) . '">' . esc_html($label) . '</button>';
                 }
                 echo '</div>';
                 echo '</div>';
@@ -146,10 +356,8 @@ class OutputHandler {
                     $html = str_replace('{{' . $k . '}}', esc_html($v), $html);
                 }
                 if ($hasFilters) {
-                    $dateValue = $hasDate && array_key_exists($dateField, $row) ? (string) $row[$dateField] : '';
-                    $categoryValue = $hasCategory && array_key_exists($categoryField, $row) ? (string) $row[$categoryField] : '';
-                    echo '<div class="reactdb-item"' . ($hasDate ? ' data-date="' . esc_attr($dateValue) . '"' : '')
-                        . ($hasCategory ? ' data-category="' . esc_attr($categoryValue) . '"' : '') . '>' . $html . '</div>';
+                    $attributes = self::build_item_attributes($row, $filters);
+                    echo '<div class="reactdb-item"' . $attributes . '>' . $html . '</div>';
                 } else {
                     echo $html;
                 }
@@ -160,11 +368,9 @@ class OutputHandler {
                     if (!is_array($row)) {
                         continue;
                     }
-                    $dateValue = $hasDate && array_key_exists($dateField, $row) ? (string) $row[$dateField] : '';
-                    $categoryValue = $hasCategory && array_key_exists($categoryField, $row) ? (string) $row[$categoryField] : '';
                     $content = '<div class="reactdb-default-row">' . esc_html(join(' | ', $row)) . '</div>';
-                    echo '<div class="reactdb-item"' . ($hasDate ? ' data-date="' . esc_attr($dateValue) . '"' : '')
-                        . ($hasCategory ? ' data-category="' . esc_attr($categoryValue) . '"' : '') . '>' . $content . '</div>';
+                    $attributes = self::build_item_attributes($row, $filters);
+                    echo '<div class="reactdb-item"' . $attributes . '>' . $content . '</div>';
                 }
             } else {
                 echo '<ul class="reactdb-output-list">';
