@@ -9,6 +9,7 @@ import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import FormGroup from '@mui/material/FormGroup';
 import MenuItem from '@mui/material/MenuItem';
+import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -90,6 +91,14 @@ const FILTER_CSS_TEMPLATE = `/* === Filter CSS Template (matches default front-e
   background: #ffffff;
 }
 
+.reactdb-tabbed-output .reactdb-output-filterGroup.is-hidden {
+  display: none !important;
+}
+
+.reactdb-tabbed-output .reactdb-output-controlPanel--hidden {
+  display: none !important;
+}
+
 .reactdb-tabbed-output .reactdb-output-filterTitle {
   font-weight: 600;
   font-size: 0.95rem;
@@ -163,7 +172,8 @@ const FILTER_DEFAULTS = {
   dateFormat: 'Y-m-d',
   delimiter: ',',
   sort: 'asc',
-  labelTemplate: ''
+  labelTemplate: '',
+  hidden: false
 };
 
 const PARAMETER_CONTROL_DEFAULT = {
@@ -200,7 +210,8 @@ const sanitizeFilter = (filter, fallbackIndex = 0) => {
     label: typeof base.label === 'string' ? base.label : '',
     dateFormat: typeof base.dateFormat === 'string' && base.dateFormat ? base.dateFormat : 'Y-m-d',
     delimiter: typeof base.delimiter === 'string' && base.delimiter !== '' ? base.delimiter : ',',
-    labelTemplate: typeof base.labelTemplate === 'string' ? base.labelTemplate : ''
+    labelTemplate: typeof base.labelTemplate === 'string' ? base.labelTemplate : '',
+    hidden: !!base.hidden
   };
 };
 
@@ -244,7 +255,8 @@ const serializeFilters = filters => (Array.isArray(filters) ? filters : []).map(
   dateFormat: filter.dateFormat,
   delimiter: filter.delimiter,
   sort: filter.sort,
-  labelTemplate: filter.labelTemplate
+  labelTemplate: filter.labelTemplate,
+  hidden: !!filter.hidden
 }));
 
 const sanitizeParameterControl = (value, filters, columns, enforceColumns = false) => {
@@ -880,11 +892,20 @@ const OutputTask = () => {
                       削除
                     </Button>
                   </Box>
-                   {filter.id && (
+                  {filter.id && (
                     <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-all' }}>
                       フィルターID: <code>{filter.id}</code>（パラメータ名: <code>filter_{filter.id}</code>）
                     </Typography>
                   )}
+                  <FormControlLabel
+                    control={(
+                      <Switch
+                        checked={!filter.hidden}
+                        onChange={e => updateFilter(filter.id, { hidden: !e.target.checked })}
+                      />
+                    )}
+                    label="このフィルターを表示"
+                  />
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
                     <TextField
                       label="グループ名"
