@@ -77,6 +77,54 @@
     });
   }
 
+  function parseConfig(container) {
+    if (!container || container.nodeType !== 1) {
+      return {};
+    }
+    var attr = container.getAttribute('data-reactdb-config');
+    if (!attr) {
+      return {};
+    }
+    try {
+      return JSON.parse(attr);
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function selectFilterValue(state, key, value, buttons) {
+    var target = null;
+    buttons.forEach(function (btn) {
+      var btnValue = btn.getAttribute('data-value') || '';
+      if (value !== '' && btnValue === value && !target) {
+        target = btn;
+      }
+    });
+    if (!target) {
+      buttons.forEach(function (btn) {
+        if (btn.getAttribute('data-default') === '1' && !target) {
+          target = btn;
+        }
+      });
+    }
+    if (!target) {
+      target = buttons.length > 0 ? buttons[0] : null;
+    }
+    buttons.forEach(function (btn) {
+      if (btn === target) {
+        btn.classList.add('is-active');
+      } else {
+        btn.classList.remove('is-active');
+      }
+    });
+    var appliedValue = '';
+    if (target) {
+      appliedValue = target.getAttribute('data-value') || '';
+    }
+    state.filters[key] = appliedValue;
+    return appliedValue;
+  }
+
   function setupContainer(container) {
     if (!container || container.nodeType !== 1) {
       return;
@@ -85,6 +133,8 @@
       return;
     }
     container.dataset.reactdbTabsInit = '1';
+    var configData = parseConfig(container);
+    var initialFilters = configData.initialFilters || {};
     var state = {
       filters: {},
       searchTokens: []
@@ -96,26 +146,18 @@
       if (!key) {
         return;
       }
-      state.filters[key] = '';
       var buttons = toArray(group.querySelectorAll('[data-value]'));
       buttons.forEach(function (btn) {
         btn.addEventListener('click', function () {
           var value = btn.getAttribute('data-value') || '';
-          state.filters[key] = value;
-          buttons.forEach(function (b) {
-            if (b === btn) {
-              b.classList.add('is-active');
-            } else {
-              b.classList.remove('is-active');
-            }
-          });
+          selectFilterValue(state, key, value, buttons);
           applyFilters(container, state);
         });
       });
-      var defaultBtn = group.querySelector('[data-default="1"]');
-      if (defaultBtn) {
-        defaultBtn.click();
-      }
+      var initialValue = Object.prototype.hasOwnProperty.call(initialFilters, key)
+        ? initialFilters[key]
+        : '';
+      selectFilterValue(state, key, initialValue, buttons);
     });
 
     var searchInput = container.querySelector('.reactdb-output-searchInput');

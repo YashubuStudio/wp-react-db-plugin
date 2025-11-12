@@ -38,7 +38,7 @@ function reactdb_output_shortcode($atts) {
     if (!$atts['task']) {
         return '<div>No task specified</div>';
     }
-    return OutputHandler::render_html($atts['task']);
+    return OutputHandler::render_html($atts['task'], $atts);
 }
 add_shortcode('reactdb_output', 'reactdb_output_shortcode');
 

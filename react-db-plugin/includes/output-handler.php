@@ -1,6 +1,7 @@
 <?php
 class OutputHandler {
     private const FILTER_MULTI_SEPARATOR = '|~|';
+    private const SORT_DIRECTIONS = ['asc', 'desc'];
     public static function get_settings() {
         $settings = get_option('reactdb_output_settings', []);
         return is_array($settings) ? $settings : [];
@@ -109,6 +110,13 @@ class OutputHandler {
                     'columns' => [],
                 ];
             }
+            $settings[$task]['parameterControl'] = self::sanitize_parameter_control_config(
+                isset($conf['parameterControl']) ? $conf['parameterControl'] : [],
+                $settings[$task]['filters']
+            );
+            $settings[$task]['defaultSort'] = self::sanitize_default_sort_config(
+                isset($conf['defaultSort']) ? $conf['defaultSort'] : []
+            );
         }
         update_option('reactdb_output_settings', $settings);
     }
@@ -120,6 +128,249 @@ class OutputHandler {
             return [];
         }
         return $wpdb->get_results("SELECT * FROM $table", ARRAY_A);
+    }
+
+    private static function normalize_parameter_source($params) {
+        if (!is_array($params)) {
+            return [];
+        }
+        $normalized = [];
+        foreach ($params as $key => $value) {
+            if (is_array($value)) {
+                continue;
+            }
+            $normalized[$key] = $value;
+        }
+        return $normalized;
+    }
+
+    private static function sanitize_parameter_control_config($config, $filters) {
+        $defaults = [
+            'allowShortcode' => false,
+            'allowUrl' => false,
+            'filters' => [],
+            'sortColumns' => [],
+        ];
+        if (!is_array($config)) {
+            $config = [];
+        }
+
+        $filterKeys = [];
+        if (is_array($filters)) {
+            foreach ($filters as $filter) {
+                if (!is_array($filter)) {
+                    continue;
+                }
+                if (isset($filter['id'])) {
+                    $id = sanitize_key($filter['id']);
+                } elseif (isset($filter['key'])) {
+                    $id = sanitize_key($filter['key']);
+                } else {
+                    $id = '';
+                }
+                if ($id === '') {
+                    continue;
+                }
+                $filterKeys[$id] = true;
+            }
+        }
+
+        $allowedFilters = [];
+        if (isset($config['filters']) && is_array($config['filters'])) {
+            foreach ($config['filters'] as $filterKey) {
+                $filterKey = sanitize_key($filterKey);
+                if ($filterKey === '') {
+                    continue;
+                }
+                if (!empty($filterKeys) && !isset($filterKeys[$filterKey])) {
+                    continue;
+                }
+                $allowedFilters[$filterKey] = true;
+            }
+        }
+
+        $allowedSortColumns = [];
+        if (isset($config['sortColumns']) && is_array($config['sortColumns'])) {
+            foreach ($config['sortColumns'] as $column) {
+                if (!is_string($column)) {
+                    continue;
+                }
+                $column = sanitize_text_field($column);
+                if ($column === '') {
+                    continue;
+                }
+                $allowedSortColumns[$column] = true;
+            }
+        }
+
+        return [
+            'allowShortcode' => !empty($config['allowShortcode']),
+            'allowUrl' => !empty($config['allowUrl']),
+            'filters' => array_keys($allowedFilters),
+            'sortColumns' => array_keys($allowedSortColumns),
+        ] + $defaults;
+    }
+
+    private static function sanitize_default_sort_config($config) {
+        if (!is_array($config)) {
+            $config = [];
+        }
+        $column = isset($config['column']) ? sanitize_text_field($config['column']) : '';
+        $direction = isset($config['direction']) ? strtolower(sanitize_text_field($config['direction'])) : 'asc';
+        if (!in_array($direction, self::SORT_DIRECTIONS, true)) {
+            $direction = 'asc';
+        }
+        return [
+            'column' => $column,
+            'direction' => $direction,
+        ];
+    }
+
+    private static function get_available_columns($rows) {
+        $columns = [];
+        if (!is_array($rows)) {
+            return $columns;
+        }
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            foreach ($row as $column => $_) {
+                if (!is_string($column)) {
+                    continue;
+                }
+                $columns[$column] = true;
+            }
+        }
+        return array_keys($columns);
+    }
+
+    private static function extract_filter_params($source, $allowedKeys) {
+        $result = [];
+        if (!is_array($source) || empty($allowedKeys)) {
+            return $result;
+        }
+        $allowed = [];
+        foreach ($allowedKeys as $key) {
+            $allowed[$key] = true;
+        }
+        foreach ($allowed as $key => $_) {
+            $paramKeys = [
+                'filter_' . $key,
+                'filter-' . $key,
+                $key,
+            ];
+            foreach ($paramKeys as $paramKey) {
+                if (!array_key_exists($paramKey, $source)) {
+                    continue;
+                }
+                $value = $source[$paramKey];
+                if (is_array($value)) {
+                    continue;
+                }
+                $value = sanitize_text_field(wp_unslash($value));
+                if ($value === '') {
+                    continue;
+                }
+                $result[$key] = $value;
+                break;
+            }
+        }
+        return $result;
+    }
+
+    private static function extract_sort_params($source, $allowedColumns) {
+        if (!is_array($source) || empty($allowedColumns)) {
+            return null;
+        }
+        $allowed = [];
+        foreach ($allowedColumns as $column) {
+            $allowed[$column] = true;
+        }
+        $column = '';
+        foreach (['sort', 'sort_column', 'sort-column'] as $key) {
+            if (!array_key_exists($key, $source)) {
+                continue;
+            }
+            $value = $source[$key];
+            if (is_array($value)) {
+                continue;
+            }
+            $value = sanitize_text_field(wp_unslash($value));
+            if ($value === '') {
+                continue;
+            }
+            if (!isset($allowed[$value])) {
+                continue;
+            }
+            $column = $value;
+            break;
+        }
+        if ($column === '') {
+            return null;
+        }
+        $direction = 'asc';
+        foreach (['order', 'direction', 'sort_order', 'sort-direction'] as $key) {
+            if (!array_key_exists($key, $source)) {
+                continue;
+            }
+            $value = $source[$key];
+            if (is_array($value)) {
+                continue;
+            }
+            $value = strtolower(sanitize_text_field(wp_unslash($value)));
+            if (in_array($value, self::SORT_DIRECTIONS, true)) {
+                $direction = $value;
+                break;
+            }
+        }
+        return [
+            'column' => $column,
+            'direction' => $direction,
+        ];
+    }
+
+    private static function apply_sorting($rows, $column, $direction) {
+        if (!is_array($rows) || empty($rows) || $column === '') {
+            return $rows;
+        }
+        $hasColumn = false;
+        foreach ($rows as $row) {
+            if (is_array($row) && array_key_exists($column, $row)) {
+                $hasColumn = true;
+                break;
+            }
+        }
+        if (!$hasColumn) {
+            return $rows;
+        }
+        $direction = $direction === 'desc' ? 'desc' : 'asc';
+        usort($rows, function ($a, $b) use ($column, $direction) {
+            $valueA = is_array($a) && array_key_exists($column, $a) ? $a[$column] : null;
+            $valueB = is_array($b) && array_key_exists($column, $b) ? $b[$column] : null;
+            $numericA = is_numeric($valueA);
+            $numericB = is_numeric($valueB);
+            if ($numericA && $numericB) {
+                $valueA = (float) $valueA;
+                $valueB = (float) $valueB;
+            } else {
+                $valueA = is_scalar($valueA) ? (string) $valueA : '';
+                $valueB = is_scalar($valueB) ? (string) $valueB : '';
+                $cmp = strnatcasecmp($valueA, $valueB);
+                if ($cmp !== 0) {
+                    return $direction === 'desc' ? -$cmp : $cmp;
+                }
+                return 0;
+            }
+            if ($valueA === $valueB) {
+                return 0;
+            }
+            if ($direction === 'desc') {
+                return ($valueA < $valueB) ? 1 : -1;
+            }
+            return ($valueA < $valueB) ? -1 : 1;
+        });
+        return array_values($rows);
     }
 
     private static function get_filter_values($rawValue, $type, $dateFormat, $delimiter) {
@@ -352,7 +603,7 @@ class OutputHandler {
         ];
     }
 
-    public static function render_html($task) {
+    public static function render_html($task, $shortcodeAtts = []) {
         $config = self::get_task($task);
         if (!$config) {
             return '<div>No settings</div>';
@@ -397,8 +648,113 @@ class OutputHandler {
             }
         }
         $filters = self::build_filters($rawFilters, $rows);
+        $parameterControl = self::sanitize_parameter_control_config(
+            isset($config['parameterControl']) ? $config['parameterControl'] : [],
+            $filters
+        );
+        $defaultSort = self::sanitize_default_sort_config(
+            isset($config['defaultSort']) ? $config['defaultSort'] : []
+        );
+        $availableColumns = self::get_available_columns($rows);
+        if (!in_array($defaultSort['column'], $availableColumns, true)) {
+            $defaultSort['column'] = '';
+        }
         $hasFilters = !empty($filters);
         $interactive = $hasFilters || $hasSearch;
+        $filterKeys = [];
+        foreach ($filters as $filter) {
+            if (isset($filter['key']) && $filter['key'] !== '') {
+                $filterKeys[] = $filter['key'];
+            }
+        }
+        $allowedFilterKeys = array_values(array_intersect($parameterControl['filters'], $filterKeys));
+        $allowedSortColumns = array_values(array_intersect($parameterControl['sortColumns'], $availableColumns));
+
+        $shortcodeParams = self::normalize_parameter_source($shortcodeAtts);
+        unset($shortcodeParams['task']);
+        $initialFilters = [];
+        $activeSort = $defaultSort;
+        if ($parameterControl['allowShortcode']) {
+            $shortcodeFilters = self::extract_filter_params($shortcodeParams, $allowedFilterKeys);
+            foreach ($shortcodeFilters as $key => $value) {
+                $initialFilters[$key] = $value;
+            }
+            $shortcodeSort = self::extract_sort_params($shortcodeParams, $allowedSortColumns);
+            if ($shortcodeSort) {
+                $activeSort = $shortcodeSort;
+            }
+        }
+        if ($parameterControl['allowUrl']) {
+            $urlParams = [];
+            foreach ($_GET as $key => $value) {
+                if (is_array($value)) {
+                    continue;
+                }
+                $urlParams[$key] = wp_unslash($value);
+            }
+            $urlFilters = self::extract_filter_params($urlParams, $allowedFilterKeys);
+            foreach ($urlFilters as $key => $value) {
+                $initialFilters[$key] = $value;
+            }
+            $urlSort = self::extract_sort_params($urlParams, $allowedSortColumns);
+            if ($urlSort) {
+                $activeSort = $urlSort;
+            }
+        }
+        if ($activeSort['column'] !== '' && !in_array($activeSort['column'], $availableColumns, true)) {
+            $activeSort['column'] = '';
+        }
+        if ($activeSort['column'] !== '') {
+            $rows = self::apply_sorting($rows, $activeSort['column'], $activeSort['direction']);
+        }
+
+        if (!empty($initialFilters) && $hasFilters) {
+            $validatedFilters = [];
+            foreach ($filters as $filter) {
+                if (!isset($filter['key']) || $filter['key'] === '') {
+                    continue;
+                }
+                $key = $filter['key'];
+                if (!isset($initialFilters[$key])) {
+                    continue;
+                }
+                $value = $initialFilters[$key];
+                if ($value === '') {
+                    continue;
+                }
+                $options = isset($filter['options']) && is_array($filter['options']) ? $filter['options'] : [];
+                if (empty($options)) {
+                    $validatedFilters[$key] = $value;
+                    continue;
+                }
+                foreach ($options as $option) {
+                    if (!is_array($option) || !isset($option['value'])) {
+                        continue;
+                    }
+                    if ((string) $option['value'] === (string) $value) {
+                        $validatedFilters[$key] = $value;
+                        break;
+                    }
+                }
+            }
+            $initialFilters = $validatedFilters;
+        }
+
+        $frontendConfig = [];
+        if (!empty($initialFilters)) {
+            $frontendConfig['initialFilters'] = $initialFilters;
+        }
+        if (!empty($activeSort['column'])) {
+            $frontendConfig['activeSort'] = $activeSort;
+        }
+        if ($parameterControl['allowShortcode'] || $parameterControl['allowUrl']) {
+            $frontendConfig['parameterControl'] = [
+                'allowShortcode' => $parameterControl['allowShortcode'],
+                'allowUrl' => $parameterControl['allowUrl'],
+                'filters' => $allowedFilterKeys,
+                'sortColumns' => $allowedSortColumns,
+            ];
+        }
         $containerId = 'reactdb-output-' . uniqid();
         $asset_dir = plugin_dir_path(__FILE__) . '../assets/';
         $plugin_file = dirname(__DIR__) . '/react-db-plugin.php';
@@ -424,7 +780,11 @@ class OutputHandler {
         }
 
         if ($interactive) {
-            echo '<div class="reactdb-tabbed-output" data-reactdb-tabbed-output="1" id="' . esc_attr($containerId) . '" data-reactdb-task="' . esc_attr($task) . '">';
+            $configAttr = '';
+            if (!empty($frontendConfig)) {
+                $configAttr = ' data-reactdb-config="' . esc_attr(wp_json_encode($frontendConfig)) . '"';
+            }
+            echo '<div class="reactdb-tabbed-output" data-reactdb-tabbed-output="1" id="' . esc_attr($containerId) . '" data-reactdb-task="' . esc_attr($task) . '"' . $configAttr . '>';
             if ($hasSearch || $hasFilters) {
                 echo '<div class="reactdb-output-controlPanel">';
                 if ($hasSearch) {

@@ -23,6 +23,8 @@ const SORT_OPTIONS = [
   { value: 'none', label: '登録順' }
 ];
 
+const SORT_DIRECTIONS = SORT_OPTIONS.filter(option => option.value !== 'none');
+
 const FILTER_CSS_TEMPLATE = `/* === Filter CSS Template (matches default front-end styles) === */
 .reactdb-tabbed-output {
   display: flex;
@@ -160,6 +162,18 @@ const FILTER_DEFAULTS = {
   labelTemplate: ''
 };
 
+const PARAMETER_CONTROL_DEFAULT = {
+  allowShortcode: false,
+  allowUrl: false,
+  filters: [],
+  sortColumns: []
+};
+
+const DEFAULT_SORT_CONFIG = {
+  column: '',
+  direction: 'asc'
+};
+
 const createFilterId = () => `filter_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
 const createFilter = (overrides = {}) => ({
@@ -229,29 +243,94 @@ const serializeFilters = filters => (Array.isArray(filters) ? filters : []).map(
   labelTemplate: filter.labelTemplate
 }));
 
+const sanitizeParameterControl = (value, filters, columns, enforceColumns = false) => {
+  const base = {
+    ...PARAMETER_CONTROL_DEFAULT,
+    ...(value && typeof value === 'object' ? value : {})
+  };
+  const filterIds = new Set(
+    Array.isArray(filters)
+      ? filters
+          .map(filter => (filter && typeof filter === 'object' ? filter.id : null))
+          .filter(id => typeof id === 'string' && id)
+      : []
+  );
+  const normalizedFilters = Array.isArray(base.filters)
+    ? Array.from(
+        new Set(
+          base.filters
+            .map(item => (typeof item === 'string' ? item : ''))
+            .filter(item => item && (filterIds.size === 0 || filterIds.has(item)))
+        )
+      )
+    : [];
+  const rawSortColumns = Array.isArray(base.sortColumns)
+    ? base.sortColumns.map(item => (typeof item === 'string' ? item : '')).filter(Boolean)
+    : [];
+  const normalizedSortColumns = enforceColumns && Array.isArray(columns) && columns.length > 0
+    ? rawSortColumns.filter(column => columns.includes(column))
+    : rawSortColumns;
+  return {
+    allowShortcode: !!base.allowShortcode,
+    allowUrl: !!base.allowUrl,
+    filters: normalizedFilters,
+    sortColumns: Array.from(new Set(normalizedSortColumns))
+  };
+};
+
+const sanitizeDefaultSortConfig = (value, columns, enforceColumns = false) => {
+  const base = {
+    ...DEFAULT_SORT_CONFIG,
+    ...(value && typeof value === 'object' ? value : {})
+  };
+  const direction = base.direction === 'desc' ? 'desc' : 'asc';
+  const column = typeof base.column === 'string' ? base.column : '';
+  const allowedColumns = Array.isArray(columns) ? columns : [];
+  const finalColumn = enforceColumns && allowedColumns.length > 0 && column && !allowedColumns.includes(column)
+    ? ''
+    : column;
+  return {
+    column: finalColumn,
+    direction
+  };
+};
+
 const OutputTask = () => {
   const { task } = useParams();
   const [settings, setSettings] = useState({});
-  const [config, setConfig] = useState({ table: '', format: 'html', html: '', css: '', filterCss: FILTER_CSS_TEMPLATE, filters: [], search: { enabled: false, columns: [] } });
+  const [config, setConfig] = useState({
+    table: '',
+    format: 'html',
+    html: '',
+    css: '',
+    filterCss: FILTER_CSS_TEMPLATE,
+    filters: [],
+    search: { enabled: false, columns: [] },
+    parameterControl: PARAMETER_CONTROL_DEFAULT,
+    defaultSort: DEFAULT_SORT_CONFIG
+  });
   const [tables, setTables] = useState([]);
   const [columns, setColumns] = useState([]);
   const [sampleRow, setSampleRow] = useState(null);
   const applySettingsToConfig = useCallback((map) => {
     const entry = map && map[task] ? map[task] : {};
     const existingFilterCss = typeof entry.filterCss === 'string' ? entry.filterCss : '';
+    const normalizedFilters = normalizeFilters(entry.filters, entry.dateField, entry.categoryField);
     setConfig({
       table: entry.table || '',
       format: entry.format || 'html',
       html: entry.html || '',
       css: entry.css || '',
       filterCss: existingFilterCss && existingFilterCss.trim() ? existingFilterCss : FILTER_CSS_TEMPLATE,
-      filters: normalizeFilters(entry.filters, entry.dateField, entry.categoryField),
+      filters: normalizedFilters,
       search: {
         enabled: !!(entry.search && (entry.search.enabled || entry.search === true)),
         columns: Array.isArray(entry.search && entry.search.columns)
           ? entry.search.columns.filter(col => typeof col === 'string')
           : []
-      }
+      },
+      parameterControl: sanitizeParameterControl(entry.parameterControl, normalizedFilters, [], false),
+      defaultSort: sanitizeDefaultSortConfig(entry.defaultSort, [], false)
     });
   }, [task]);
   // fetch columns and sample row when table selected
@@ -281,6 +360,9 @@ const OutputTask = () => {
             columns: cfg.search.columns.filter(column => names.includes(column))
           };
         }
+        const enforceColumns = names.length > 0;
+        next.parameterControl = sanitizeParameterControl(next.parameterControl, next.filters, names, enforceColumns);
+        next.defaultSort = sanitizeDefaultSortConfig(next.defaultSort, names, enforceColumns);
         return next;
       });
     };
@@ -353,6 +435,8 @@ const OutputTask = () => {
     const searchColumns = Array.isArray(config.search?.columns)
       ? config.search.columns.filter(column => columns.includes(column))
       : [];
+    const sanitizedParameterControl = sanitizeParameterControl(config.parameterControl, config.filters, columns, columns.length > 0);
+    const sanitizedDefaultSort = sanitizeDefaultSortConfig(config.defaultSort, columns, columns.length > 0);
     const preparedConfig = {
       ...config,
       filters: serializeFilters(config.filters),
@@ -361,7 +445,9 @@ const OutputTask = () => {
       search: {
         enabled: Boolean(config.search?.enabled) && searchColumns.length > 0,
         columns: searchColumns
-      }
+      },
+      parameterControl: sanitizedParameterControl,
+      defaultSort: sanitizedDefaultSort
     };
     const newSettings = { ...settings, [task]: preparedConfig };
     if (isPlugin) {
@@ -407,9 +493,11 @@ const OutputTask = () => {
   const mutateFilter = (id, updater) => {
     setConfig(cfg => {
       const current = Array.isArray(cfg.filters) ? cfg.filters : [];
+      const updatedFilters = current.map(filter => (filter.id === id ? updater(filter) : filter));
       return {
         ...cfg,
-        filters: current.map(filter => (filter.id === id ? updater(filter) : filter))
+        filters: updatedFilters,
+        parameterControl: sanitizeParameterControl(cfg.parameterControl, updatedFilters, columns, columns.length > 0)
       };
     });
   };
@@ -421,9 +509,11 @@ const OutputTask = () => {
   const removeFilter = (id) => {
     setConfig(cfg => {
       const current = Array.isArray(cfg.filters) ? cfg.filters : [];
+      const updatedFilters = current.filter(filter => filter.id !== id);
       return {
         ...cfg,
-        filters: current.filter(filter => filter.id !== id)
+        filters: updatedFilters,
+        parameterControl: sanitizeParameterControl(cfg.parameterControl, updatedFilters, columns, columns.length > 0)
       };
     });
   };
@@ -431,9 +521,33 @@ const OutputTask = () => {
   const addFilter = () => {
     setConfig(cfg => {
       const current = Array.isArray(cfg.filters) ? cfg.filters : [];
+      const updatedFilters = [...current, createFilter({ label: `フィルター${current.length + 1}` })];
       return {
         ...cfg,
-        filters: [...current, createFilter({ label: `フィルター${current.length + 1}` })]
+        filters: updatedFilters,
+        parameterControl: sanitizeParameterControl(cfg.parameterControl, updatedFilters, columns, columns.length > 0)
+      };
+    });
+  };
+
+  const updateParameterControl = updater => {
+    setConfig(cfg => {
+      const current = sanitizeParameterControl(cfg.parameterControl, cfg.filters, columns, columns.length > 0);
+      const next = typeof updater === 'function' ? updater(current) : current;
+      return {
+        ...cfg,
+        parameterControl: sanitizeParameterControl(next, cfg.filters, columns, columns.length > 0)
+      };
+    });
+  };
+
+  const updateDefaultSort = updater => {
+    setConfig(cfg => {
+      const current = sanitizeDefaultSortConfig(cfg.defaultSort, columns, columns.length > 0);
+      const next = typeof updater === 'function' ? updater(current) : current;
+      return {
+        ...cfg,
+        defaultSort: sanitizeDefaultSortConfig(next, columns, columns.length > 0)
       };
     });
   };
@@ -466,6 +580,11 @@ const OutputTask = () => {
   const endpoint = apiEndpoint(`output/${task}`);
   const previewData = sampleRow || columns.reduce((acc, col) => ({ ...acc, [col]: col }), {});
   const searchConfig = config.search || { enabled: false, columns: [] };
+  const parameterControl = sanitizeParameterControl(config.parameterControl, filters, columns, columns.length > 0);
+  const defaultSort = sanitizeDefaultSortConfig(config.defaultSort, columns, columns.length > 0);
+  const filterLabelMap = new Map(
+    filters.map(filter => [filter.id, filter.label || filter.column || filter.id])
+  );
 
   return (
     <Box>
@@ -494,12 +613,24 @@ const OutputTask = () => {
             fullWidth
             label="テーブル"
             value={config.table}
-            onChange={e => setConfig(cfg => ({
-              ...cfg,
-              table: e.target.value,
-              filters: [],
-              search: { ...cfg.search, columns: [] }
-            }))}
+            onChange={e => {
+              const value = e.target.value;
+              setConfig(cfg => {
+                const baseParam = sanitizeParameterControl(cfg.parameterControl, [], [], false);
+                return {
+                  ...cfg,
+                  table: value,
+                  filters: [],
+                  search: { ...cfg.search, columns: [] },
+                  parameterControl: {
+                    ...baseParam,
+                    filters: [],
+                    sortColumns: []
+                  },
+                  defaultSort: DEFAULT_SORT_CONFIG
+                };
+              });
+            }}
           >
             <MenuItem value="">選択</MenuItem>
             {tables.map(t => <MenuItem key={t} value={t}>{t}</MenuItem>)}
@@ -593,6 +724,130 @@ const OutputTask = () => {
                     )}
                   </Box>
                 )}
+              </Box>
+              <Box sx={{ border: '1px solid', borderColor: 'grey.300', borderRadius: 1, p: 1.5, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+                <Typography variant="subtitle1" component="div">パラメータ設定</Typography>
+                <FormGroup row sx={{ gap: 2 }}>
+                  <FormControlLabel
+                    control={(
+                      <Checkbox
+                        checked={parameterControl.allowShortcode}
+                        onChange={e => updateParameterControl(current => ({
+                          ...current,
+                          allowShortcode: e.target.checked
+                        }))}
+                      />
+                    )}
+                    label="ショートコード属性を許可"
+                  />
+                  <FormControlLabel
+                    control={(
+                      <Checkbox
+                        checked={parameterControl.allowUrl}
+                        onChange={e => updateParameterControl(current => ({
+                          ...current,
+                          allowUrl: e.target.checked
+                        }))}
+                      />
+                    )}
+                    label="URL パラメータを許可"
+                  />
+                </FormGroup>
+                <Typography variant="body2" color="text.secondary">
+                  パラメータ名は <code>filter_フィルターID</code>、<code>sort</code>、<code>order</code> を使用します。
+                </Typography>
+                <TextField
+                  select
+                  label="操作可能なフィルター"
+                  value={parameterControl.filters}
+                  onChange={e => {
+                    const value = e.target.value;
+                    const selections = Array.isArray(value) ? value : value ? [value] : [];
+                    updateParameterControl(current => ({
+                      ...current,
+                      filters: selections
+                    }));
+                  }}
+                  disabled={filters.length === 0}
+                  SelectProps={{
+                    multiple: true,
+                    renderValue: selected => {
+                      if (!Array.isArray(selected) || selected.length === 0) {
+                        return '未選択';
+                      }
+                      return selected
+                        .map(key => filterLabelMap.get(key) || key)
+                        .join(', ');
+                    }
+                  }}
+                  helperText={filters.length === 0 ? 'フィルターを追加すると選択できます。' : 'ショートコードや URL から変更できるフィルターを選択します。'}
+                >
+                  {filters.map(filter => (
+                    <MenuItem key={`param-filter-${filter.id}`} value={filter.id}>
+                      {filterLabelMap.get(filter.id)}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <TextField
+                  select
+                  label="ソート可能なカラム"
+                  value={parameterControl.sortColumns}
+                  onChange={e => {
+                    const value = e.target.value;
+                    const selections = Array.isArray(value) ? value : value ? [value] : [];
+                    updateParameterControl(current => ({
+                      ...current,
+                      sortColumns: selections
+                    }));
+                  }}
+                  disabled={columns.length === 0}
+                  SelectProps={{
+                    multiple: true,
+                    renderValue: selected => {
+                      if (!Array.isArray(selected) || selected.length === 0) {
+                        return '未選択';
+                      }
+                      return selected.join(', ');
+                    }
+                  }}
+                  helperText={columns.length === 0 ? 'テーブルを選択するとカラムを設定できます。' : 'sort / order パラメータで指定可能なカラムを選びます。'}
+                >
+                  {columns.map(column => (
+                    <MenuItem key={`param-sort-${column}`} value={column}>{column}</MenuItem>
+                  ))}
+                </TextField>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+                  <TextField
+                    select
+                    label="デフォルトソートのカラム"
+                    value={defaultSort.column}
+                    onChange={e => updateDefaultSort(current => ({
+                      ...current,
+                      column: e.target.value
+                    }))}
+                    sx={{ minWidth: 200, flex: '1 1 200px' }}
+                  >
+                    <MenuItem value="">未設定</MenuItem>
+                    {columns.map(column => (
+                      <MenuItem key={`default-sort-${column}`} value={column}>{column}</MenuItem>
+                    ))}
+                  </TextField>
+                  <TextField
+                    select
+                    label="デフォルトソートの向き"
+                    value={defaultSort.direction}
+                    onChange={e => updateDefaultSort(current => ({
+                      ...current,
+                      direction: e.target.value
+                    }))}
+                    sx={{ minWidth: 200, flex: '1 1 200px' }}
+                    disabled={defaultSort.column === ''}
+                  >
+                    {SORT_DIRECTIONS.map(option => (
+                      <MenuItem key={`default-sort-dir-${option.value}`} value={option.value}>{option.label}</MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
               </Box>
               {filters.length === 0 && (
                 <Typography variant="body2" color="text.secondary">
