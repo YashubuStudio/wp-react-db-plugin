@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import Accordion from '@mui/material/Accordion';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import AccordionSummary from '@mui/material/AccordionSummary';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
@@ -8,6 +11,7 @@ import FormGroup from '@mui/material/FormGroup';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import isPlugin, { apiNonce, apiEndpoint } from '../isPlugin';
 import HTMLPreview from '../components/HTMLPreview';
 
@@ -953,28 +957,54 @@ const OutputTask = () => {
         )}
         {config.format === 'html' && (
           <>
-            <TextField
-              label="フィルターCSS"
-              multiline
-              minRows={3}
-              value={config.filterCss}
-              onChange={e => setConfig({ ...config, filterCss: e.target.value })}
-              helperText="フィルター表示をカスタマイズする CSS を入力できます。"
-            />
-            <TextField
-              label="CSS"
-              multiline
-              minRows={4}
-              value={config.css}
-              onChange={e => setConfig({ ...config, css: e.target.value })}
-            />
-            <TextField
-              label="HTML"
-              multiline
-              minRows={4}
-              value={config.html}
-              onChange={e => setConfig({ ...config, html: e.target.value })}
-            />
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              <Accordion defaultExpanded disableGutters>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Typography variant="subtitle1">フィルター・ソート CSS</Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <TextField
+                    fullWidth
+                    label="フィルターCSS"
+                    multiline
+                    minRows={3}
+                    value={config.filterCss}
+                    onChange={e => setConfig({ ...config, filterCss: e.target.value })}
+                    helperText="フィルターやソート UI をカスタマイズする CSS を入力できます。"
+                  />
+                </AccordionDetails>
+              </Accordion>
+              <Accordion defaultExpanded disableGutters>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Typography variant="subtitle1">出力 CSS</Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <TextField
+                    fullWidth
+                    label="CSS"
+                    multiline
+                    minRows={4}
+                    value={config.css}
+                    onChange={e => setConfig({ ...config, css: e.target.value })}
+                  />
+                </AccordionDetails>
+              </Accordion>
+              <Accordion defaultExpanded disableGutters>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Typography variant="subtitle1">HTML テンプレート</Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <TextField
+                    fullWidth
+                    label="HTML"
+                    multiline
+                    minRows={4}
+                    value={config.html}
+                    onChange={e => setConfig({ ...config, html: e.target.value })}
+                  />
+                </AccordionDetails>
+              </Accordion>
+            </Box>
             <Typography variant="body1" sx={{ mb: 2, fontSize: '1rem' }}>
               ショートコード: [reactdb_output task="{task}"]
             </Typography>
