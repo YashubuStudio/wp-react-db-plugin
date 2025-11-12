@@ -2,7 +2,7 @@
 /*
 Plugin Name: React DB Plugin
 Description: React-based DB management.
-Version: 1.6
+Version: 1.8
 Author: YashubuStudio
 */
 
