@@ -880,6 +880,11 @@ const OutputTask = () => {
                       削除
                     </Button>
                   </Box>
+                   {filter.id && (
+                    <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-all' }}>
+                      フィルターID: <code>{filter.id}</code>（パラメータ名: <code>filter_{filter.id}</code>）
+                    </Typography>
+                  )}
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
                     <TextField
                       label="グループ名"
