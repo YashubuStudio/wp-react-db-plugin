@@ -59,6 +59,14 @@
   background: #ffffff;
 }
 
+.reactdb-tabbed-output .reactdb-output-filterGroup.is-hidden {
+  display: none !important;
+}
+
+.reactdb-tabbed-output .reactdb-output-controlPanel--hidden {
+  display: none !important;
+}
+
 .reactdb-tabbed-output .reactdb-output-filterTitle {
   font-weight: 600;
   font-size: 0.95rem;

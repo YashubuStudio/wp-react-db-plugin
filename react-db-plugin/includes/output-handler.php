@@ -69,6 +69,7 @@ class OutputHandler {
                         ? $filter['sort']
                         : 'asc';
                     $labelTemplate = isset($filter['labelTemplate']) ? sanitize_text_field($filter['labelTemplate']) : '';
+                    $hidden = !empty($filter['hidden']);
                     $filters[] = [
                         'id' => $id,
                         'label' => $label,
@@ -78,6 +79,7 @@ class OutputHandler {
                         'delimiter' => $delimiter,
                         'sort' => $sort,
                         'labelTemplate' => $labelTemplate,
+                        'hidden' => $hidden,
                     ];
                 }
                 $settings[$task]['filters'] = $filters;
@@ -464,6 +466,7 @@ class OutputHandler {
                 $sort = 'asc';
             }
             $labelTemplate = isset($filter['labelTemplate']) ? (string) $filter['labelTemplate'] : '';
+            $hidden = !empty($filter['hidden']);
             $valueSet = [];
             if ($column !== '') {
                 foreach ($rows as $row) {
@@ -499,6 +502,7 @@ class OutputHandler {
                 'delimiter' => $delimiter,
                 'sort' => $sort,
                 'labelTemplate' => $labelTemplate,
+                'hidden' => $hidden,
                 'options' => $options,
             ];
             $index++;
@@ -660,6 +664,15 @@ class OutputHandler {
             $defaultSort['column'] = '';
         }
         $hasFilters = !empty($filters);
+        $hasVisibleFilters = false;
+        if ($hasFilters) {
+            foreach ($filters as $filter) {
+                if (empty($filter['hidden'])) {
+                    $hasVisibleFilters = true;
+                    break;
+                }
+            }
+        }
         $interactive = $hasFilters || $hasSearch;
         $filterKeys = [];
         foreach ($filters as $filter) {
@@ -786,7 +799,11 @@ class OutputHandler {
             }
             echo '<div class="reactdb-tabbed-output" data-reactdb-tabbed-output="1" id="' . esc_attr($containerId) . '" data-reactdb-task="' . esc_attr($task) . '"' . $configAttr . '>';
             if ($hasSearch || $hasFilters) {
-                echo '<div class="reactdb-output-controlPanel">';
+                $controlPanelClasses = ['reactdb-output-controlPanel'];
+                if ($hasFilters && !$hasSearch && !$hasVisibleFilters) {
+                    $controlPanelClasses[] = 'reactdb-output-controlPanel--hidden';
+                }
+                echo '<div class="' . esc_attr(implode(' ', $controlPanelClasses)) . '">';
                 if ($hasSearch) {
                     echo '<div class="reactdb-output-searchBlock"><label class="reactdb-output-searchLabel" for="' . esc_attr($containerId) . '-search">';
                     echo '<span class="reactdb-output-searchTitle">キーワード検索</span>';
@@ -798,7 +815,14 @@ class OutputHandler {
                         continue;
                     }
                     $options = isset($filter['options']) && is_array($filter['options']) ? $filter['options'] : [];
-                    echo '<div class="reactdb-output-filterGroup reactdb-output-filterGroup-' . esc_attr($filter['key']) . '" data-filter="' . esc_attr($filter['key']) . '">';
+                    $groupClasses = [
+                        'reactdb-output-filterGroup',
+                        'reactdb-output-filterGroup-' . $filter['key'],
+                    ];
+                    if (!empty($filter['hidden'])) {
+                        $groupClasses[] = 'is-hidden';
+                    }
+                    echo '<div class="' . esc_attr(implode(' ', $groupClasses)) . '" data-filter="' . esc_attr($filter['key']) . '">';
                     echo '<div class="reactdb-output-filterTitle">' . esc_html($filter['label']) . '</div>';
                     echo '<div class="reactdb-output-filterList">';
                     echo '<button type="button" class="reactdb-output-filterButton is-active" data-value="" data-default="1">すべて</button>';
