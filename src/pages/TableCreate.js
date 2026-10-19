@@ -7,7 +7,9 @@ import MenuItem from '@mui/material/MenuItem';
 import Tooltip from '@mui/material/Tooltip';
 import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
+import Alert from '@mui/material/Alert';
 import { apiNonce, apiEndpoint } from '../isPlugin';
+import { readApiResponse } from '../apiResponse';
 
 const typeOptions = [
   { value: 'INT', label: 'INT', desc: '整数型 -2147483648〜2147483647' },
@@ -22,6 +24,8 @@ const TableCreate = () => {
   const [columns, setColumns] = useState([{ name: '', type: 'TEXT', default: '' }]);
   const [addCreated, setAddCreated] = useState(false);
   const [addUpdated, setAddUpdated] = useState(false);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
 
   const addColumn = () => setColumns([...columns, { name: '', type: 'TEXT', default: '' }]);
@@ -32,7 +36,7 @@ const TableCreate = () => {
     setColumns(cols);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!name) return;
     let cols = columns.slice();
     if (addCreated) {
@@ -41,16 +45,27 @@ const TableCreate = () => {
     if (addUpdated) {
       cols.push({ name: 'updated_at', type: 'DATETIME', default: '' });
     }
-    fetch(apiEndpoint('table/create'), {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': apiNonce },
-      body: JSON.stringify({ name, columns: cols }),
-    }).then(() => navigate('/'));
+    setSaving(true);
+    setError('');
+    try {
+      const response = await fetch(apiEndpoint('table/create'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': apiNonce },
+        body: JSON.stringify({ name, columns: cols }),
+      });
+      await readApiResponse(response);
+      navigate('/');
+    } catch (err) {
+      setError(err.message || 'テーブルを作成できませんでした。');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <Box>
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       <TextField label="テーブル名" value={name} onChange={(e) => setName(e.target.value)} sx={{ mb: 2 }} />
       {columns.map((c, i) => (
         <Box key={i} sx={{ display: 'flex', mb: 1 }}>
@@ -77,7 +92,7 @@ const TableCreate = () => {
         />
       </Box>
       <Button onClick={addColumn} sx={{ mr: 2 }}>カラム追加</Button>
-      <Button variant="contained" onClick={handleSubmit}>作成</Button>
+      <Button variant="contained" onClick={handleSubmit} disabled={saving}>{saving ? '作成中...' : '作成'}</Button>
     </Box>
   );
 };

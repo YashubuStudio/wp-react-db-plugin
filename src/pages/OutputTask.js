@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import Alert from '@mui/material/Alert';
 import Accordion from '@mui/material/Accordion';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import AccordionSummary from '@mui/material/AccordionSummary';
@@ -15,6 +16,8 @@ import Typography from '@mui/material/Typography';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import isPlugin, { apiNonce, apiEndpoint } from '../isPlugin';
 import HTMLPreview from '../components/HTMLPreview';
+import { readApiResponse } from '../apiResponse';
+import { hasTask, loadOutputSettings, mutateOutputTask } from '../outputSettingsApi';
 
 const FILTER_TYPES = [
   { value: 'text', label: '値をそのまま使用' },
@@ -313,6 +316,14 @@ const sanitizeDefaultSortConfig = (value, columns, enforceColumns = false) => {
 
 const OutputTask = () => {
   const { task } = useParams();
+  const navigate = useNavigate();
+  const routeEpoch = useRef(0);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [columnsLoading, setColumnsLoading] = useState(false);
+  const [columnsError, setColumnsError] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [settings, setSettings] = useState({});
   const [config, setConfig] = useState({
     table: '',
@@ -329,15 +340,15 @@ const OutputTask = () => {
   const [columns, setColumns] = useState([]);
   const [sampleRow, setSampleRow] = useState(null);
   const applySettingsToConfig = useCallback((map) => {
-    const entry = map && map[task] ? map[task] : {};
-    const existingFilterCss = typeof entry.filterCss === 'string' ? entry.filterCss : '';
+    const entry = map && hasTask(map, task) ? map[task] : {};
+    const existingFilterCss = typeof entry.filterCss === 'string' ? entry.filterCss : FILTER_CSS_TEMPLATE;
     const normalizedFilters = normalizeFilters(entry.filters, entry.dateField, entry.categoryField);
     setConfig({
       table: entry.table || '',
       format: entry.format || 'html',
       html: entry.html || '',
       css: entry.css || '',
-      filterCss: existingFilterCss && existingFilterCss.trim() ? existingFilterCss : FILTER_CSS_TEMPLATE,
+      filterCss: existingFilterCss,
       filters: normalizedFilters,
       search: {
         enabled: !!(entry.search && (entry.search.enabled || entry.search === true)),
@@ -349,105 +360,97 @@ const OutputTask = () => {
       defaultSort: sanitizeDefaultSortConfig(entry.defaultSort, [], false)
     });
   }, [task]);
-  // fetch columns and sample row when table selected
+  // Only a successful response for the current table may normalize column settings.
   useEffect(() => {
+    let active = true;
     const selectedTable = config.table;
-    const currentFormat = config.format;
+    setColumns([]);
+    setSampleRow(null);
+    setColumnsError('');
     if (!selectedTable) {
-      setColumns([]);
-      setSampleRow(null);
-      return;
+      setColumnsLoading(false);
+      return () => { active = false; };
     }
+    setColumnsLoading(true);
     const handleCols = (cols) => {
+      if (!active) return;
       const names = Array.isArray(cols) ? cols : [];
       setColumns(names);
-      setConfig(cfg => {
-        const next = { ...cfg };
-        if (currentFormat === 'html' && names.length > 0 && !cfg.html) {
-          const snippet = `<div class="reactdb-row">\n  ${names
-            .map(c => `{{${c}}}`)
-            .join(' | ')}\n</div>`;
-          next.html = snippet;
-        }
-        next.filters = ensureValidFilters(cfg.filters, names);
-        if (cfg.search && Array.isArray(cfg.search.columns)) {
-          next.search = {
-            enabled: !!cfg.search.enabled && cfg.search.columns.some(column => names.includes(column)),
-            columns: cfg.search.columns.filter(column => names.includes(column))
-          };
-        }
-        const enforceColumns = names.length > 0;
-        next.parameterControl = sanitizeParameterControl(next.parameterControl, next.filters, names, enforceColumns);
-        next.defaultSort = sanitizeDefaultSortConfig(next.defaultSort, names, enforceColumns);
-        return next;
-      });
+      setConfig(cfg => ({
+        ...cfg,
+        filters: ensureValidFilters(cfg.filters, names),
+        search: {
+          enabled: !!cfg.search?.enabled && cfg.search.columns.some(column => names.includes(column)),
+          columns: (cfg.search?.columns || []).filter(column => names.includes(column))
+        },
+        parameterControl: sanitizeParameterControl(cfg.parameterControl, cfg.filters, names, true),
+        defaultSort: sanitizeDefaultSortConfig(cfg.defaultSort, names, true)
+      }));
     };
     if (isPlugin) {
-      fetch(apiEndpoint(`table/info?name=${selectedTable}`), {
-        credentials: 'include',
-        headers: { 'X-WP-Nonce': apiNonce }
+      fetch(apiEndpoint(`table/info?name=${encodeURIComponent(selectedTable)}`), {
+        credentials: 'include', headers: { 'X-WP-Nonce': apiNonce }
       })
-        .then(r => r.json())
-        .then(data => handleCols(Array.isArray(data) ? data.map(c => c.Field) : []))
-        .catch(() => handleCols([]));
-      fetch(apiEndpoint(`table/export?name=${selectedTable}`), {
-        credentials: 'include',
-        headers: { 'X-WP-Nonce': apiNonce }
+        .then(readApiResponse)
+        .then(data => {
+          if (!Array.isArray(data) || data.some(col => typeof col?.Field !== 'string')) {
+            throw new Error('テーブルのカラム情報が不正です。');
+          }
+          handleCols(data.map(col => col.Field));
+        })
+        .catch(err => { if (active) setColumnsError(err.message || 'カラム情報を取得できませんでした。'); })
+        .finally(() => { if (active) setColumnsLoading(false); });
+      fetch(apiEndpoint(`table/export?name=${encodeURIComponent(selectedTable)}`), {
+        credentials: 'include', headers: { 'X-WP-Nonce': apiNonce }
       })
-        .then(r => r.json())
-        .then(rows => setSampleRow(Array.isArray(rows) && rows.length > 0 ? rows[0] : null))
-        .catch(() => setSampleRow(null));
+        .then(readApiResponse)
+        .then(rows => { if (active) setSampleRow(Array.isArray(rows) && rows.length ? rows[0] : null); })
+        .catch(() => { if (active) setSampleRow(null); });
     } else {
       handleCols(['id', 'value']);
       setSampleRow({ id: 1, value: 'sample' });
+      setColumnsLoading(false);
     }
-    }, [config.table, config.format]);
+    return () => { active = false; };
+  }, [config.table]);
 
   useEffect(() => {
+    let active = true;
+    routeEpoch.current += 1;
+    setSaving(false);
+    setLoading(true);
+    setError('');
+    setSuccess('');
     if (isPlugin) {
-      fetch(apiEndpoint('output/settings'), {
-        credentials: 'include',
-        headers: { 'X-WP-Nonce': apiNonce }
-      })
-        .then(r => r.json())
-        .then(data => {
+      Promise.all([
+        loadOutputSettings(),
+        fetch(apiEndpoint('tables'), { credentials: 'include', headers: { 'X-WP-Nonce': apiNonce } }).then(readApiResponse)
+      ])
+        .then(([data, tableNames]) => {
+          if (!active) return;
+          if (!hasTask(data, task)) throw new Error('このタスクは存在しません。出力設定の一覧から選び直してください。');
+          if (!Array.isArray(tableNames)) throw new Error('テーブル一覧の形式が不正です。');
           setSettings(data);
+          setTables(tableNames);
           applySettingsToConfig(data);
-        });
-      fetch(apiEndpoint('tables'), {
-        credentials: 'include',
-        headers: { 'X-WP-Nonce': apiNonce }
-      })
-        .then(r => r.json())
-        .then(data => setTables(Array.isArray(data) ? data : []));
+        })
+        .catch(err => { if (active) setError(err.message || '出力設定を取得できませんでした。'); })
+        .finally(() => { if (active) setLoading(false); });
     } else {
       setTables(['demo_table']);
       applySettingsToConfig({});
+      setLoading(false);
     }
+    return () => { active = false; routeEpoch.current += 1; };
   }, [task, applySettingsToConfig]);
 
-  useEffect(() => {
-    setConfig(cfg => {
-      if (!cfg.search || !Array.isArray(cfg.search.columns)) {
-        return cfg;
-      }
-      const valid = cfg.search.columns.filter(column => columns.includes(column));
-      if (valid.length === cfg.search.columns.length) {
-        return cfg;
-      }
-      return {
-        ...cfg,
-        search: {
-          ...cfg.search,
-          enabled: cfg.search.enabled && valid.length > 0,
-          columns: valid
-        }
-      };
-    });
-  }, [columns]);
-
-  const handleSave = () => {
-    if (!task || !config.table) return;
+  const handleSave = async () => {
+    if (saving || loading || columnsLoading || columnsError) return;
+    if (!task || !config.table) { setError('出力元のテーブルを選択してください。'); return; }
+    setError('');
+    setSuccess('');
+    setSaving(true);
+    const operationEpoch = routeEpoch.current;
     const searchColumns = Array.isArray(config.search?.columns)
       ? config.search.columns.filter(column => columns.includes(column))
       : [];
@@ -465,44 +468,34 @@ const OutputTask = () => {
       parameterControl: sanitizedParameterControl,
       defaultSort: sanitizedDefaultSort
     };
-    const newSettings = { ...settings, [task]: preparedConfig };
-    if (isPlugin) {
-      fetch(apiEndpoint('output/settings'), {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': apiNonce },
-        body: JSON.stringify({ settings: newSettings })
-      })
-        .then(r => r.json())
-        .then(data => {
-          setSettings(data);
-          applySettingsToConfig(data);
-        });
-    } else {
-      setSettings(newSettings);
-      applySettingsToConfig(newSettings);
+    try {
+      const saved = isPlugin
+        ? await mutateOutputTask({ action: 'save', task, config: preparedConfig, previous: settings[task] })
+        : { ...settings, [task]: preparedConfig };
+      if (operationEpoch !== routeEpoch.current) return;
+      setSettings(saved);
+      applySettingsToConfig(saved);
+      setSuccess('HTML・CSSを含む出力設定を保存しました。');
+    } catch (err) {
+      if (operationEpoch === routeEpoch.current) setError(err.message || '設定を保存できませんでした。入力コードは保持されています。');
+    } finally {
+      if (operationEpoch === routeEpoch.current) setSaving(false);
     }
   };
 
-  const handleDelete = () => {
-    if (!task) return;
-    const newSettings = { ...settings };
-    delete newSettings[task];
-    if (isPlugin) {
-      fetch(apiEndpoint('output/settings'), {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': apiNonce },
-        body: JSON.stringify({ settings: newSettings })
-      })
-        .then(r => r.json())
-        .then(data => {
-          setSettings(data);
-          applySettingsToConfig(data);
-        });
-    } else {
-      setSettings(newSettings);
-      applySettingsToConfig(newSettings);
+  const handleDelete = async () => {
+    if (!task || saving || loading) return;
+    setError('');
+    setSuccess('');
+    setSaving(true);
+    const operationEpoch = routeEpoch.current;
+    try {
+      if (isPlugin) await mutateOutputTask({ action: 'delete', task, previous: settings[task] });
+      if (operationEpoch === routeEpoch.current) navigate('/output');
+    } catch (err) {
+      if (operationEpoch === routeEpoch.current) setError(err.message || '設定を削除できませんでした。');
+    } finally {
+      if (operationEpoch === routeEpoch.current) setSaving(false);
     }
   };
 
@@ -605,6 +598,10 @@ const OutputTask = () => {
   return (
     <Box>
       <Typography variant="h5" gutterBottom>タスク設定: {task}</Typography>
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {columnsError && <Alert severity="error" sx={{ mb: 2 }}>{columnsError} 入力コードは保持されています。</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
+      {loading && <Typography>設定を読み込み中...</Typography>}
       <Box
         sx={{
           display: 'flex',
@@ -614,7 +611,11 @@ const OutputTask = () => {
         }}
       >
         <Box
+          component="fieldset"
+          inert={loading || saving || (isPlugin && !hasTask(settings, task)) ? '' : undefined}
+          disabled={loading || saving || (isPlugin && !hasTask(settings, task))}
           sx={{
+            border: 0, p: 0, m: 0,
             display: 'flex',
             flexDirection: 'column',
             maxWidth: 720,
@@ -995,8 +996,8 @@ const OutputTask = () => {
                     multiline
                     minRows={3}
                     value={config.filterCss}
-                    onChange={e => setConfig({ ...config, filterCss: e.target.value })}
-                    helperText="フィルターやソート UI をカスタマイズする CSS を入力できます。"
+                    onChange={e => setConfig(cfg => ({ ...cfg, filterCss: e.target.value }))}
+                    helperText="フィルターやソート UI のCSS本体を入力してください。空欄のまま保存することもできます。"
                   />
                 </AccordionDetails>
               </Accordion>
@@ -1008,10 +1009,11 @@ const OutputTask = () => {
                   <TextField
                     fullWidth
                     label="CSS"
+                    helperText="<style>タグを含めず、CSS本体だけを入力してください。"
                     multiline
                     minRows={4}
                     value={config.css}
-                    onChange={e => setConfig({ ...config, css: e.target.value })}
+                    onChange={e => setConfig(cfg => ({ ...cfg, css: e.target.value }))}
                   />
                 </AccordionDetails>
               </Accordion>
@@ -1023,10 +1025,11 @@ const OutputTask = () => {
                   <TextField
                     fullWidth
                     label="HTML"
+                    helperText="各行の値を {{列名}} で参照できます。"
                     multiline
                     minRows={4}
                     value={config.html}
-                    onChange={e => setConfig({ ...config, html: e.target.value })}
+                    onChange={e => setConfig(cfg => ({ ...cfg, html: e.target.value }))}
                   />
                 </AccordionDetails>
               </Accordion>
@@ -1040,8 +1043,8 @@ const OutputTask = () => {
           <Box sx={{ mb: 2 }}>エンドポイント: {endpoint}</Box>
         )}
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button variant="contained" onClick={handleSave}>保存</Button>
-          <Button color="error" variant="outlined" onClick={handleDelete}>削除</Button>
+          <Button variant="contained" onClick={handleSave} disabled={loading || saving || columnsLoading || !!columnsError || !config.table}>{saving ? '処理中...' : '保存'}</Button>
+          <Button color="error" variant="outlined" onClick={handleDelete} disabled={loading || saving}>削除</Button>
         </Box>
         </Box>
         {config.format === 'html' && (

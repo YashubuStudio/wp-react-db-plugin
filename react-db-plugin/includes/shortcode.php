@@ -71,7 +71,10 @@ function reactdb_app_shortcode() {
         'currentUser' => $user->display_name,
         'logoutUrl'   => wp_logout_url(),
         'nonce'       => wp_create_nonce('wp_rest'),
-        'apiBase'     => esc_url_raw(rest_url('reactdb/v1/'))
+        'apiBase'     => esc_url_raw(rest_url('reactdb/v1/')),
+        'auth'        => reactdb_current_auth_state(),
+        'ajaxUrl'     => esc_url_raw(admin_url('admin-ajax.php')),
+        'canonicalAppUrl' => esc_url_raw(home_url('/react-db-app/'))
     ]);
 
     return ob_get_clean();

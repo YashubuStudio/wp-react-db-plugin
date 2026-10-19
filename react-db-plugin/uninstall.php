@@ -1,15 +1,9 @@
 <?php
 if (!defined('WP_UNINSTALL_PLUGIN')) {
-    exit();
+    exit;
 }
 
-global $wpdb;
-$table = $wpdb->prefix . 'reactdb_logs';
-$wpdb->query("DROP TABLE IF EXISTS $table");
+require_once __DIR__ . '/includes/cleanup.php';
 
-// Remove the React DB page created on activation
-$page = get_page_by_path('react-db-app');
-if ($page) {
-    wp_delete_post($page->ID, true);
-    flush_rewrite_rules();
-}
+// Deleting the plugin from WordPress is the explicit full-reset operation.
+reactdb_uninstall_current_site();

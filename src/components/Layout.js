@@ -3,6 +3,7 @@ import Box from '@mui/material/Box';
 import Toolbar from '@mui/material/Toolbar';
 import Header from './Header';
 import Sidebar from './Sidebar';
+import AuthStatus from './AuthStatus';
 
 const Layout = ({ children }) => {
   const [adminBarHeight, setAdminBarHeight] = useState(0);
@@ -24,7 +25,7 @@ const Layout = ({ children }) => {
         <Sidebar adminBarHeight={adminBarHeight} />
         <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
           <Toolbar sx={{ minHeight: `calc(64px + ${adminBarHeight}px)` }} />
-          {children}
+          <AuthStatus>{children}</AuthStatus>
         </Box>
       </Box>
     </Box>

@@ -1,13 +1,50 @@
 <?php
+
+/** Shared permission callback for all management endpoints. */
+function reactdb_admin_permission() {
+    $authenticated = reactdb_authenticated_permission();
+    if (is_wp_error($authenticated)) {
+        return $authenticated;
+    }
+    if (!current_user_can('manage_options')) {
+        $auth = reactdb_current_auth_state();
+        return new WP_Error('reactdb_forbidden', reactdb_auth_denial_message($auth), ['status' => 403, 'auth' => $auth]);
+    }
+    return true;
+}
+
+/** Only infer dates from explicit, unambiguous date formats. */
+function reactdb_csv_value_is_date($value) {
+    $value = trim((string) $value);
+    $patterns = [
+        '/^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?$/',
+        '/^\d{4}\/\d{1,2}\/\d{1,2}(?:[ T]\d{1,2}:\d{2}(?::\d{2})?)?$/',
+    ];
+
+    foreach ($patterns as $pattern) {
+        if (preg_match($pattern, $value)) {
+            return strtotime($value) !== false;
+        }
+    }
+
+    return false;
+}
+
 add_action('rest_api_init', function () {
+    register_rest_route('reactdb/v1', '/auth/status', [
+        'methods' => 'GET',
+        'callback' => function () {
+            return new WP_REST_Response(reactdb_current_auth_state(), 200, ['Cache-Control' => 'private, no-store, max-age=0']);
+        },
+        'permission_callback' => 'reactdb_authenticated_permission'
+    ]);
+
     register_rest_route('reactdb/v1', '/csv/read', [
         'methods' => 'GET',
         'callback' => function () {
             return CSVHandler::readCSV(WP_CONTENT_DIR . '/uploads/sample.csv');
         },
-        'permission_callback' => function() {
-            return current_user_can('manage_options');
-        }
+        'permission_callback' => 'reactdb_admin_permission'
     ]);
 
     register_rest_route('reactdb/v1', '/csv/write', [
@@ -18,9 +55,7 @@ add_action('rest_api_init', function () {
             LogHandler::addLog(get_current_user_id(), 'CSV Update', 'Updated CSV via React DB plugin.');
             return ['status' => 'success'];
         },
-        'permission_callback' => function() {
-            return current_user_can('manage_options');
-        }
+        'permission_callback' => 'reactdb_admin_permission'
     ]);
 
     register_rest_route('reactdb/v1', '/logs', [
@@ -30,9 +65,7 @@ add_action('rest_api_init', function () {
             $table = $wpdb->prefix . 'reactdb_logs';
             return $wpdb->get_results("SELECT * FROM $table ORDER BY created_at DESC LIMIT 10", ARRAY_A);
         },
-        'permission_callback' => function () {
-            return current_user_can('manage_options');
-        }
+        'permission_callback' => 'reactdb_admin_permission'
     ]);
 
     // --- Database management endpoints ---
@@ -48,9 +81,7 @@ add_action('rest_api_init', function () {
             }, $tables);
             return $tables;
         },
-        'permission_callback' => function () {
-            return current_user_can('manage_options');
-        }
+        'permission_callback' => 'reactdb_admin_permission'
     ]);
 
     register_rest_route('reactdb/v1', '/table/create', [
@@ -94,9 +125,7 @@ add_action('rest_api_init', function () {
 
             return ['status' => 'created'];
         },
-        'permission_callback' => function () {
-            return current_user_can('manage_options');
-        }
+        'permission_callback' => 'reactdb_admin_permission'
     ]);
 
     register_rest_route('reactdb/v1', '/table/export', [
@@ -111,9 +140,7 @@ add_action('rest_api_init', function () {
             $rows = $wpdb->get_results("SELECT * FROM $table", ARRAY_A);
             return $rows;
         },
-        'permission_callback' => function () {
-            return current_user_can('manage_options');
-        }
+        'permission_callback' => 'reactdb_admin_permission'
     ]);
 
     register_rest_route('reactdb/v1', '/table/import', [
@@ -123,8 +150,25 @@ add_action('rest_api_init', function () {
 
             $files = $request->get_file_params();
             $uploaded = isset($files['file']) ? $files['file'] : null;
-            if (!$uploaded || !is_uploaded_file($uploaded['tmp_name'])) {
+            if (!$uploaded) {
                 return new WP_Error('invalid_file', 'CSV file required', ['status' => 400]);
+            }
+            $uploadError = isset($uploaded['error']) ? (int) $uploaded['error'] : UPLOAD_ERR_OK;
+            if ($uploadError !== UPLOAD_ERR_OK) {
+                $uploadMessages = [
+                    UPLOAD_ERR_INI_SIZE   => 'アップロードファイルがサーバーの上限サイズを超えています。',
+                    UPLOAD_ERR_FORM_SIZE  => 'アップロードファイルがフォームの上限サイズを超えています。',
+                    UPLOAD_ERR_PARTIAL    => 'ファイルを最後まで受信できませんでした。再試行してください。',
+                    UPLOAD_ERR_NO_FILE    => 'CSVファイルを選択してください。',
+                    UPLOAD_ERR_NO_TMP_DIR => 'サーバーの一時保存先が設定されていません。管理者に確認してください。',
+                    UPLOAD_ERR_CANT_WRITE => 'サーバーが一時ファイルを書き込めませんでした。管理者に確認してください。',
+                    UPLOAD_ERR_EXTENSION  => 'サーバーの拡張機能によりアップロードが停止されました。管理者に確認してください。',
+                ];
+                $message = isset($uploadMessages[$uploadError]) ? $uploadMessages[$uploadError] : 'ファイルのアップロードに失敗しました。';
+                return new WP_Error('upload_failed', $message, ['status' => 400, 'upload_error' => $uploadError]);
+            }
+            if (empty($uploaded['tmp_name']) || !is_uploaded_file($uploaded['tmp_name'])) {
+                return new WP_Error('invalid_file', 'アップロードされた一時ファイルを確認できません。再試行してください。', ['status' => 400]);
             }
 
             $name = sanitize_key($request->get_param('table'));
@@ -367,7 +411,12 @@ add_action('rest_api_init', function () {
                 $values = array_column($sample, $idx);
                 $values = array_filter($values, function($v){ return $v !== '' && $v !== null; });
                 $type = 'TEXT';
-                if (!empty($values)) {
+                // Venue codes/names are categorical text, even if a venue label
+                // happens to look numeric or date-like to PHP.
+                $isVenueColumn = strtolower($columnKey) === 'venue';
+                if ($isVenueColumn) {
+                    $type = 'VARCHAR(255)';
+                } elseif (!empty($values)) {
                     $is_int = true;
                     $is_float = true;
                     $is_date = true;
@@ -377,7 +426,7 @@ add_action('rest_api_init', function () {
                         $max_len = max($max_len, is_string($v) ? strlen($v) : strlen((string) $v));
                         if (!preg_match('/^-?\d+$/', (string) $v)) { $is_int = false; }
                         if (!is_numeric($v)) { $is_float = false; }
-                        if (strtotime((string) $v) === false) { $is_date = false; }
+                        if (!reactdb_csv_value_is_date($v)) { $is_date = false; }
                     }
                     if ($is_int) {
                         $type = 'BIGINT';
@@ -407,8 +456,8 @@ add_action('rest_api_init', function () {
             dbDelta($sql);
 
             if (!$wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table))) {
-                $error = $wpdb->last_error ? $wpdb->last_error : 'テーブルの作成に失敗しました。';
-                return new WP_Error('table_creation_failed', $error, ['status' => 500]);
+                $error = $wpdb->last_error ? $wpdb->last_error : 'データベースがテーブルを作成できませんでした。';
+                return new WP_Error('table_creation_failed', 'テーブルの作成に失敗しました: ' . $error, ['status' => 500]);
             }
 
             $preparedRows = [];
@@ -434,6 +483,16 @@ add_action('rest_api_init', function () {
                 $preparedRows[] = $data;
             }
 
+            if ($failedRows > 0) {
+                // Remove the incomplete table so a failed import can be retried safely.
+                $wpdb->query("DROP TABLE $table");
+                return new WP_Error('import_insert_failed', 'CSVデータの一部を保存できなかったため、作成したテーブルを削除しました。内容を確認して再試行してください。', [
+                    'status'      => 500,
+                    'failed_rows' => $failedRows,
+                    'source_rows' => count($normalizedRows),
+                    'reason'      => $lastInsertError !== '' ? $lastInsertError : 'データベースへの登録に失敗しました。',
+                ]);
+            }
             LogHandler::addLog(get_current_user_id(), 'Import Table', $name);
 
             $previewRows = array_slice($preparedRows, 0, 20);
@@ -457,9 +516,7 @@ add_action('rest_api_init', function () {
                 ],
             ];
         },
-        'permission_callback' => function () {
-            return current_user_can('manage_options');
-        }
+        'permission_callback' => 'reactdb_admin_permission'
     ]);
 
     register_rest_route('reactdb/v1', '/table/copy', [
@@ -486,9 +543,7 @@ add_action('rest_api_init', function () {
             LogHandler::addLog(get_current_user_id(), 'Copy Table', "$name to $new_name");
             return ['status' => 'copied'];
         },
-        'permission_callback' => function () {
-            return current_user_can('manage_options');
-        }
+        'permission_callback' => 'reactdb_admin_permission'
     ]);
 
     register_rest_route('reactdb/v1', '/table/info', [
@@ -503,9 +558,7 @@ add_action('rest_api_init', function () {
             $cols = $wpdb->get_results("DESCRIBE $table", ARRAY_A);
             return $cols;
         },
-        'permission_callback' => function () {
-            return current_user_can('manage_options');
-        }
+        'permission_callback' => 'reactdb_admin_permission'
     ]);
 
     register_rest_route('reactdb/v1', '/table/row', [
@@ -524,9 +577,7 @@ add_action('rest_api_init', function () {
             }
             return $row;
         },
-        'permission_callback' => function () {
-            return current_user_can('manage_options');
-        }
+        'permission_callback' => 'reactdb_admin_permission'
     ]);
 
     register_rest_route('reactdb/v1', '/table/update', [
@@ -551,9 +602,7 @@ add_action('rest_api_init', function () {
             LogHandler::addLog(get_current_user_id(), 'Update Row', $name);
             return ['status' => 'updated'];
         },
-        'permission_callback' => function () {
-            return current_user_can('manage_options');
-        }
+        'permission_callback' => 'reactdb_admin_permission'
     ]);
 
     register_rest_route('reactdb/v1', '/table/addrow', [
@@ -580,9 +629,7 @@ add_action('rest_api_init', function () {
             LogHandler::addLog(get_current_user_id(), 'Insert Row', $name);
             return ['status' => 'inserted'];
         },
-        'permission_callback' => function () {
-            return current_user_can('manage_options');
-        }
+        'permission_callback' => 'reactdb_admin_permission'
     ]);
 
     register_rest_route('reactdb/v1', '/table/delete', [
@@ -599,15 +646,12 @@ add_action('rest_api_init', function () {
             LogHandler::addLog(get_current_user_id(), 'Delete Row', $name);
             return ['status' => 'deleted'];
         },
-        'permission_callback' => function () {
-            return current_user_can('manage_options');
-        }
+        'permission_callback' => 'reactdb_admin_permission'
     ]);
 
     register_rest_route('reactdb/v1', '/table/drop', [
         'methods'  => 'POST',
         'callback' => function (WP_REST_Request $request) {
-            global $wpdb;
             $name = sanitize_key($request->get_param('name'));
             if (!$name) {
                 return new WP_Error('invalid_name', 'Invalid table name', ['status' => 400]);
@@ -618,18 +662,19 @@ add_action('rest_api_init', function () {
                 return new WP_Error('forbidden', 'Table cannot be deleted', ['status' => 403]);
             }
 
-            $table = $wpdb->prefix . 'reactdb_' . $name;
-            if (!$wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table))) {
-                return new WP_Error('invalid_table', 'Table not found', ['status' => 404]);
+            $deleted = reactdb_drop_managed_table($name);
+            if (is_wp_error($deleted)) {
+                return $deleted;
             }
 
-            $wpdb->query("DROP TABLE $table");
             LogHandler::addLog(get_current_user_id(), 'Drop Table', $name);
+            $cleanup = reactdb_remove_output_settings_for_table($name);
+            if (is_wp_error($cleanup)) {
+                return new WP_Error('output_settings_cleanup_failed', 'テーブルは削除されましたが、関連する出力設定の削除に失敗しました。出力設定を再読み込みしてください。', ['status' => 500]);
+            }
             return ['status' => 'dropped'];
         },
-        'permission_callback' => function () {
-            return current_user_can('manage_options');
-        }
+        'permission_callback' => 'reactdb_admin_permission'
     ]);
 
     register_rest_route('reactdb/v1', '/user/(?P<id>\d+)', [
@@ -644,35 +689,32 @@ add_action('rest_api_init', function () {
                 'name' => $user->user_login
             ];
         },
-        'permission_callback' => function () {
-            return current_user_can('manage_options');
-        }
+        'permission_callback' => 'reactdb_admin_permission'
     ]);
 
     // Output settings - admin access
     register_rest_route('reactdb/v1', '/output/settings', [
         'methods'  => 'GET',
         'callback' => function () {
-            return OutputHandler::get_settings();
+            $settings = reactdb_prune_orphaned_output_settings();
+            return is_wp_error($settings) ? $settings : (object) $settings;
         },
-        'permission_callback' => function () {
-            return current_user_can('manage_options');
-        }
+        'permission_callback' => 'reactdb_admin_permission'
     ]);
 
     register_rest_route('reactdb/v1', '/output/settings', [
         'methods'  => 'POST',
         'callback' => function (WP_REST_Request $request) {
-            $settings = $request->get_param('settings');
-            if (!is_array($settings)) {
-                return new WP_Error('invalid_settings', 'Invalid settings', ['status' => 400]);
-            }
-            OutputHandler::update_settings($settings);
-            return OutputHandler::get_settings();
+            $settings = OutputHandler::mutate_task(
+                $request->get_param('action'),
+                $request->get_param('task'),
+                $request->get_param('config'),
+                $request->get_param('previous'),
+                $request->has_param('previous')
+            );
+            return is_wp_error($settings) ? $settings : (object) $settings;
         },
-        'permission_callback' => function () {
-            return current_user_can('manage_options');
-        }
+        'permission_callback' => 'reactdb_admin_permission'
     ]);
 
     // Output API - public access

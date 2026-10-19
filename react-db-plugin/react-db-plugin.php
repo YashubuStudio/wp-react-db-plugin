@@ -2,7 +2,9 @@
 /*
 Plugin Name: React DB Plugin
 Description: React-based DB management.
-Version: 1.8
+Version: 1.9.6
+Requires at least: 5.8
+Requires PHP: 7.4
 Author: YashubuStudio
 */
 
@@ -12,7 +14,9 @@ defined('ABSPATH') || exit;
 
 
 // REST APIを含める
+require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/api.php';
+require_once __DIR__ . '/includes/cleanup.php';
 require_once __DIR__ . '/includes/csv-handler.php';
 require_once __DIR__ . '/includes/log-handler.php';
 require_once __DIR__ . '/includes/output-handler.php';
@@ -25,7 +29,7 @@ register_activation_hook(__FILE__, function() {
     $charset_collate = $wpdb->get_charset_collate();
     $table = $wpdb->prefix . 'reactdb_logs';
 
-    $sql = "CREATE TABLE IF NOT EXISTS $table (
+    $sql = "CREATE TABLE $table (
         id mediumint(9) NOT NULL AUTO_INCREMENT,
         user_id bigint(20) NOT NULL,
         action text NOT NULL,
@@ -36,6 +40,11 @@ register_activation_hook(__FILE__, function() {
 
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
     dbDelta($sql);
+
+    $created_table = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $wpdb->esc_like($table)));
+    if ($created_table !== $table) {
+        error_log('React DB Plugin: Failed to create the reactdb_logs table: ' . $wpdb->last_error);
+    }
 
     // Create front-end page for the React app if it doesn't exist
     if (!get_page_by_path('react-db-app')) {

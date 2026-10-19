@@ -1,33 +1,30 @@
 const fs = require('fs');
 const path = require('path');
 
-const buildDir = path.join(__dirname, '..', 'build');
-const targetDir = path.join(__dirname, '..', 'react-db-plugin', 'assets');
-
-if (!fs.existsSync(targetDir)) {
+function copyBuild(buildDir, targetDir) {
+  // A previous bundle can remain in build/static. The manifest is authoritative.
+  const manifest = JSON.parse(fs.readFileSync(path.join(buildDir, 'asset-manifest.json'), 'utf8'));
   fs.mkdirSync(targetDir, { recursive: true });
-}
-
-function findFile(dir, pattern) {
-  const files = fs.readdirSync(dir);
-  const match = files.find(f => pattern.test(f));
-  return match ? path.join(dir, match) : null;
-}
-
-function copyFile(srcPattern, destName) {
-  const src = findFile(srcPattern.dir, srcPattern.regex);
-  if (!src) {
-    throw new Error(`File matching ${srcPattern.regex} not found in ${srcPattern.dir}`);
+  for (const [entry, destination] of [['main.js', 'app.js'], ['main.css', 'app.css']]) {
+    const entryPath = manifest.files && manifest.files[entry];
+    if (typeof entryPath !== 'string') throw new Error(`Missing build manifest entry: ${entry}`);
+    const assetPath = new URL(entryPath, 'https://build.invalid/').pathname;
+    const staticIndex = assetPath.indexOf('/static/');
+    if (staticIndex < 0) throw new Error(`Invalid build asset path: ${entryPath}`);
+    const source = path.resolve(buildDir, assetPath.slice(staticIndex + 1));
+    if (!source.startsWith(path.resolve(buildDir) + path.sep)) throw new Error('Build asset is outside build directory');
+    const target = path.join(targetDir, destination);
+    fs.copyFileSync(source, target);
+    console.log(`Copied ${source} -> ${target}`);
   }
-  const dest = path.join(targetDir, destName);
-  fs.copyFileSync(src, dest);
-  console.log(`Copied ${src} -> ${dest}`);
 }
 
-try {
-  copyFile({dir: path.join(buildDir, 'static', 'js'), regex: /^main.*\.js$/}, 'app.js');
-  copyFile({dir: path.join(buildDir, 'static', 'css'), regex: /^main.*\.css$/}, 'app.css');
-} catch (err) {
-  console.error(err.message);
-  process.exit(1);
+if (require.main === module) {
+  try {
+    copyBuild(path.join(__dirname, '..', 'build'), path.join(__dirname, '..', 'react-db-plugin', 'assets'));
+  } catch (error) {
+    console.error(error.message);
+    process.exitCode = 1;
+  }
 }
+module.exports = { copyBuild };

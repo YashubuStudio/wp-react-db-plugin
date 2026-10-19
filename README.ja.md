@@ -69,3 +69,17 @@ JSON 形式で返されます。
 ```bash
 npm test
 ```
+
+## 出力設定の保存（1.9.5）
+
+HTML/CSSはコードとして保持し、同名タスクへの新規登録や古い画面からの保存による上書きを防ぎます。保存失敗時は入力を残して理由を表示します。CSS欄にはstyleタグを含めずCSS本体を入力してください。WordPressでHTMLが制限される権限の場合、制限により内容が変わるHTMLはエラーとして通知します。
+
+管理用 `POST /wp-json/reactdb/v1/output/settings` は、全件置換からタスク単位の操作へ変更しました。
+
+- 新規作成: `{ "action": "create", "task": "demo", "config": { "table": "papers", "format": "html", "html": "<p>{{title}}</p>", "css": "" } }`
+- 更新: `action` を `save` とし、`task`、更新する `config`、GETで取得した当該タスクの元の設定を `previous` に指定します。
+- 削除: `action` を `delete` とし、`task` と元の設定 `previous` を指定します。
+
+ログイン・管理権限・REST nonceが必要です。重複作成や競合では409、書込失敗では500を返し、成功時は保存済み設定マップを返します。公開出力APIは変更していません。
+
+詳細なレビュー結果と検証範囲は [REVIEW-1.9.5.ja.md](REVIEW-1.9.5.ja.md) を参照してください。

@@ -13,7 +13,7 @@ add_filter('pre_set_site_transient_update_plugins', function($transient) {
         return $transient;
     }
 
-    $response = wp_remote_get('https://api.github.com/repos/YashubuStudio/react-db-plugin/releases/latest');
+    $response = wp_remote_get('https://api.github.com/repos/YashubuStudio/wp-react-db-plugin/releases/latest');
     if (is_wp_error($response)) {
         return $transient;
     }
@@ -40,7 +40,7 @@ add_filter('plugins_api', function($result, $action, $args) {
         return $result;
     }
 
-    $response = wp_remote_get('https://api.github.com/repos/YashubuStudio/react-db-plugin/releases/latest');
+    $response = wp_remote_get('https://api.github.com/repos/YashubuStudio/wp-react-db-plugin/releases/latest');
     if (is_wp_error($response)) {
         return $result;
     }

@@ -12,23 +12,142 @@ class OutputHandler {
         return isset($settings[$task]) ? $settings[$task] : null;
     }
 
-    public static function update_settings($settings) {
+    /** Read the database directly so stale option caches cannot overwrite code. */
+    public static function read_settings_snapshot() {
+        global $wpdb;
+        $raw = $wpdb->get_var($wpdb->prepare(
+            "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
+            'reactdb_output_settings'
+        ));
+        if ($wpdb->last_error !== '') {
+            return new WP_Error('output_settings_read_failed', '出力設定をデータベースから取得できませんでした。', ['status' => 500]);
+        }
+        $settings = $raw === null ? [] : maybe_unserialize($raw);
         if (!is_array($settings)) {
-            return;
+            return new WP_Error('invalid_stored_settings', '保存済みの出力設定が不正です。データを保護するため上書きを中止しました。', ['status' => 500]);
+        }
+        return ['raw' => $raw, 'settings' => $settings];
+    }
+
+    private static function settings_conflict() {
+        return new WP_Error('output_settings_conflict', '別の画面で設定が更新されています。入力コードを控えてから再読み込みし、最新の設定で再保存してください。', ['status' => 409]);
+    }
+
+    /** Compare-and-swap protects both task edits and automatic cleanup. */
+    public static function store_settings_snapshot($settings, $previous_raw) {
+        global $wpdb;
+        $serialized = maybe_serialize($settings);
+        if ($previous_raw === null) {
+            $updated = add_option('reactdb_output_settings', $settings, '', false);
+            if (!$updated) {
+                return $wpdb->last_error !== ''
+                    ? new WP_Error('output_settings_write_failed', '出力設定を保存できませんでした。データベースの書込権限や容量を確認してください。', ['status' => 500])
+                    : self::settings_conflict();
+            }
+        } elseif ($serialized !== $previous_raw) {
+            // BINARY is essential: code differing only in case must not compare equal.
+            $updated = $wpdb->query($wpdb->prepare(
+                "UPDATE {$wpdb->options} SET option_value = %s, autoload = 'no' WHERE option_name = %s AND BINARY option_value = BINARY %s",
+                $serialized,
+                'reactdb_output_settings',
+                $previous_raw
+            ));
+            if ($updated === false) {
+                return new WP_Error('output_settings_write_failed', '出力設定を保存できませんでした。データベースの書込権限や容量を確認してください。', ['status' => 500]);
+            }
+            if ($updated === 0) {
+                return self::settings_conflict();
+            }
+        }
+
+        wp_cache_delete('reactdb_output_settings', 'options');
+        wp_cache_delete('alloptions', 'options');
+        wp_cache_delete('notoptions', 'options');
+        $stored = self::read_settings_snapshot();
+        if (is_wp_error($stored)) {
+            return $stored;
+        }
+        if ($stored['raw'] !== $serialized) {
+            return self::settings_conflict();
+        }
+        return $stored['settings'];
+    }
+
+    /** Only the requested task is changed; other tasks are never resubmitted. */
+    public static function mutate_task($action, $task, $config, $previous, $has_previous) {
+        global $wpdb;
+        if (!in_array($action, ['create', 'save', 'delete'], true)) {
+            return new WP_Error('output_editor_outdated', '保存画面が古いか、操作の指定が不正です。入力コードを控えてページを再読み込みしてください。', ['status' => 400]);
+        }
+        if (!is_string($task) || !preg_match('/^[A-Za-z0-9_-]+$/', $task)) {
+            return new WP_Error('invalid_task', 'タスク名は半角英数字、ハイフン、アンダースコアで指定してください。', ['status' => 400]);
+        }
+        $snapshot = self::read_settings_snapshot();
+        if (is_wp_error($snapshot)) {
+            return $snapshot;
+        }
+        $settings = $snapshot['settings'];
+        $exists = array_key_exists($task, $settings);
+        if ($action === 'create' && $exists) {
+            return new WP_Error('output_task_exists', '同じタスク名が存在します。既存のリンクから編集するか、別の名前を指定してください。', ['status' => 409]);
+        }
+        if ($action !== 'create' && (!$exists || !$has_previous || $settings[$task] !== $previous)) {
+            return self::settings_conflict();
+        }
+        if ($action === 'delete') {
+            unset($settings[$task]);
+        } else {
+            if (is_array($config) && $exists && is_array($settings[$task])) {
+                $config = array_replace($settings[$task], $config);
+            }
+            $normalized = self::normalize_settings([$task => $config], $settings);
+            if (is_wp_error($normalized)) {
+                return $normalized;
+            }
+            $table = $wpdb->prefix . 'reactdb_' . $normalized[$task]['table'];
+            $found = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $wpdb->esc_like($table)));
+            if ($wpdb->last_error !== '') {
+                return new WP_Error('output_table_read_failed', '出力元テーブルを確認できませんでした。', ['status' => 500]);
+            }
+            if ($found !== $table) {
+                return new WP_Error('output_table_missing', '出力元のテーブルが存在しません。テーブルを選び直してください。', ['status' => 400]);
+            }
+            $settings[$task] = $normalized[$task];
+        }
+        return self::store_settings_snapshot($settings, $snapshot['raw']);
+    }
+
+    private static function normalize_settings($settings, $previous = []) {
+        if (!is_array($settings)) {
+            return new WP_Error('invalid_settings', '出力設定の形式が不正です。', ['status' => 400]);
         }
         foreach ($settings as $task => $conf) {
-            if (isset($conf['html'])) {
-                $settings[$task]['html'] = wp_kses_post($conf['html']);
+            if (!preg_match('/^[A-Za-z0-9_-]+$/', (string) $task) || !is_array($conf)) {
+                return new WP_Error('invalid_task', 'タスク名または設定の形式が不正です。', ['status' => 400]);
             }
-            if (isset($conf['css'])) {
-                $settings[$task]['css'] = wp_strip_all_tags(is_string($conf['css']) ? $conf['css'] : '');
-            } elseif (!isset($settings[$task]['css'])) {
-                $settings[$task]['css'] = '';
+            if (empty($conf['table']) || !is_string($conf['table']) || sanitize_key($conf['table']) !== $conf['table']) {
+                return new WP_Error('invalid_table', '出力元のテーブル名が不正です。', ['status' => 400]);
             }
-            if (isset($conf['filterCss'])) {
-                $settings[$task]['filterCss'] = wp_strip_all_tags(is_string($conf['filterCss']) ? $conf['filterCss'] : '');
-            } elseif (!isset($settings[$task]['filterCss'])) {
-                $settings[$task]['filterCss'] = '';
+            if (!isset($conf['format']) || !in_array($conf['format'], ['html', 'json'], true)) {
+                return new WP_Error('invalid_format', '出力形式はHTMLまたはJSONを指定してください。', ['status' => 400]);
+            }
+            foreach (['html', 'css', 'filterCss'] as $field) {
+                if (isset($conf[$field]) && !is_string($conf[$field])) {
+                    return new WP_Error('invalid_code', $field . 'は文字列で指定してください。', ['status' => 400]);
+                }
+                // REST JSON is already unslashed. Preserve quotes, backslashes,
+                // template placeholders, newlines and CSS content verbatim.
+                $settings[$task][$field] = isset($conf[$field]) ? $conf[$field] : '';
+            }
+            $html = $settings[$task]['html'];
+            $old_html = isset($previous[$task]['html']) ? $previous[$task]['html'] : '';
+            if ($html !== $old_html && !current_user_can('unfiltered_html') && wp_kses_post($html) !== $html) {
+                return new WP_Error('reactdb_html_permission', 'このHTMLを変更せず保存するにはunfiltered_html権限が必要です。入力したコードは保持されています。マルチサイトでは特権管理者で操作してください。', ['status' => 403]);
+            }
+            foreach (['css', 'filterCss'] as $field) {
+                if (preg_match('/<\/?style\b/i', $settings[$task][$field])) {
+                    return new WP_Error('invalid_css', $field . 'には<style>タグを含めず、CSS本体だけを入力してください。', ['status' => 400]);
+                }
             }
             if (isset($conf['dateField'])) {
                 $settings[$task]['dateField'] = sanitize_text_field($conf['dateField']);
@@ -120,7 +239,7 @@ class OutputHandler {
                 isset($conf['defaultSort']) ? $conf['defaultSort'] : []
             );
         }
-        update_option('reactdb_output_settings', $settings);
+        return $settings;
     }
 
     public static function get_rows($table) {
@@ -607,6 +726,13 @@ class OutputHandler {
         ];
     }
 
+    public static function render_template($template, $row) {
+        // Substitute once so data containing {{another_column}} stays literal.
+        return preg_replace_callback('/{{([^{}]+)}}/', function ($match) use ($row) {
+            return array_key_exists($match[1], $row) ? esc_html($row[$match[1]] ?? '') : $match[0];
+        }, $template);
+    }
+
     public static function render_html($task, $shortcodeAtts = []) {
         $config = self::get_task($task);
         if (!$config) {
@@ -847,10 +973,7 @@ class OutputHandler {
                 if (!is_array($row)) {
                     continue;
                 }
-                $html = $config['html'];
-                foreach ($row as $k => $v) {
-                    $html = str_replace('{{' . $k . '}}', esc_html($v), $html);
-                }
+                $html = self::render_template($config['html'], $row);
                 if ($interactive) {
                     $attributes = '';
                     if ($hasFilters) {

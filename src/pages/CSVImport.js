@@ -14,6 +14,7 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import isPlugin, { apiNonce, apiEndpoint } from '../isPlugin';
+import { apiErrorMessage } from '../apiResponse';
 
 const normalizeOverride = (value) => {
   if (typeof value !== 'string') return '';
@@ -135,7 +136,7 @@ const CSVImport = () => {
           setLog('一部の列名がそのままでは使用できません。半角英数字とアンダースコアのみで代替名を入力してください。');
           return;
         }
-        const message = data?.message || 'インポートに失敗しました。';
+        const message = apiErrorMessage(data, response.status) || 'インポートに失敗しました。';
         throw new Error(message);
       }
 

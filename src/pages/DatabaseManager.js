@@ -13,7 +13,9 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
+import Alert from '@mui/material/Alert';
 import isPlugin, { apiNonce, apiEndpoint } from '../isPlugin';
+import { readApiResponse } from '../apiResponse';
 
 const protectedTables = ['logs'];
 
@@ -23,6 +25,7 @@ const DatabaseManager = () => {
   const [rows, setRows] = useState([]);
   const [newTable, setNewTable] = useState('');
   const [copyName, setCopyName] = useState('');
+  const [apiError, setApiError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -33,15 +36,7 @@ const DatabaseManager = () => {
           'X-WP-Nonce': apiNonce
         }
       })
-        .then((r) => {
-          if (!r.ok) {
-            if (r.status === 401) {
-              throw new Error('unauthorized');
-            }
-            throw new Error('fetch failed');
-          }
-          return r.json();
-        })
+        .then(readApiResponse)
         .then((data) => {
           if (Array.isArray(data)) {
             setTables(data);
@@ -50,40 +45,40 @@ const DatabaseManager = () => {
           }
         })
         .catch((err) => {
-          console.error(err);
+          setApiError(err.message || 'テーブル一覧を取得できませんでした。');
         });
     } else {
       setTables(['demo_table']);
     }
   }, []);
 
-  const fetchRows = (table) => {
+  const fetchRows = async (table) => {
     if (!table) return;
     if (isPlugin) {
-        fetch(apiEndpoint(`table/export?name=${table}`), {
-        credentials: 'include',
-        headers: { 'X-WP-Nonce': apiNonce }
-      })
-        .then((r) => r.json())
-        .then((data) => {
+      try {
+        setApiError('');
+        const response = await fetch(apiEndpoint(`table/export?name=${encodeURIComponent(table)}`), {
+          credentials: 'include',
+          headers: { 'X-WP-Nonce': apiNonce }
+        });
+        const data = await readApiResponse(response);
           if (Array.isArray(data) && data.length > 0) {
             const header = Object.keys(data[0]);
             const body = data.map((row) => Object.values(row));
             setRows([header, ...body]);
           } else {
-            fetch(apiEndpoint(`table/info?name=${table}`), {
+            const infoResponse = await fetch(apiEndpoint(`table/info?name=${encodeURIComponent(table)}`), {
               credentials: 'include',
               headers: { 'X-WP-Nonce': apiNonce }
-            })
-              .then((r) => r.json())
-              .then((cols) => {
-                const header = Array.isArray(cols) ? cols.map((c) => c.Field) : [];
-                setRows([header]);
-              })
-              .catch(() => setRows([]));
+            });
+            const cols = await readApiResponse(infoResponse);
+            const header = Array.isArray(cols) ? cols.map((c) => c.Field) : [];
+            setRows([header]);
           }
-        })
-        .catch(() => setRows([]));
+      } catch (error) {
+        setRows([]);
+        setApiError(error.message || 'テーブルの内容を取得できませんでした。');
+      }
     } else {
       setRows([
         ['id', 'value'],
@@ -94,13 +89,16 @@ const DatabaseManager = () => {
 
   const handleCreate = () => {
     if (!newTable) return;
+    setApiError('');
     navigate(`/create?name=${encodeURIComponent(newTable)}`);
     setNewTable('');
   };
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!selected || !copyName) return;
-    fetch(apiEndpoint('table/copy'), {
+    setApiError('');
+    try {
+      const response = await fetch(apiEndpoint('table/copy'), {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -108,21 +106,21 @@ const DatabaseManager = () => {
         'X-WP-Nonce': apiNonce
       },
       body: JSON.stringify({ name: selected, new_name: copyName })
-    })
-      .then(() => {
-        setCopyName('');
-        return fetch(apiEndpoint('tables'), {
-          credentials: 'include',
-          headers: { 'X-WP-Nonce': apiNonce }
-        });
-      })
-      .then(r => r.json())
-      .then(data => setTables(Array.isArray(data) ? data : []));
+      });
+      await readApiResponse(response);
+      setCopyName('');
+      const listResponse = await fetch(apiEndpoint('tables'), { credentials: 'include', headers: { 'X-WP-Nonce': apiNonce } });
+      const data = await readApiResponse(listResponse);
+      setTables(Array.isArray(data) ? data : []);
+    } catch (error) {
+      setApiError(error.message || 'テーブルを複製できませんでした。');
+    }
   };
 
   const handleDropTable = () => {
     if (!selected || protectedTables.includes(selected)) return;
     if (!window.confirm(`${selected} を削除します。よろしいですか？`)) return;
+    setApiError('');
     fetch(apiEndpoint('table/drop'), {
       method: 'POST',
       credentials: 'include',
@@ -132,16 +130,19 @@ const DatabaseManager = () => {
       },
       body: JSON.stringify({ name: selected })
     })
+      .then(readApiResponse)
       .then(() => fetch(apiEndpoint('tables'), { credentials: 'include', headers: { 'X-WP-Nonce': apiNonce } }))
-      .then(r => r.json())
+      .then(readApiResponse)
       .then(data => {
         setTables(Array.isArray(data) ? data : []);
         setSelected('');
         setRows([]);
-      });
+      })
+      .catch((error) => setApiError(error.message || 'テーブルを削除できませんでした。'));
   };
 
   const handleDelete = (id) => {
+    setApiError('');
     fetch(apiEndpoint('table/delete'), {
       method: 'POST',
       credentials: 'include',
@@ -150,7 +151,7 @@ const DatabaseManager = () => {
         'X-WP-Nonce': apiNonce
       },
       body: JSON.stringify({ name: selected, id })
-    }).then(() => fetchRows(selected));
+    }).then(readApiResponse).then(() => fetchRows(selected)).catch((error) => setApiError(error.message || '行を削除できませんでした。'));
   };
 
   const handleAdd = () => {
@@ -165,6 +166,7 @@ const DatabaseManager = () => {
 
   return (
     <Box sx={{ display: 'flex' }}>
+      {apiError && <Alert severity="error" sx={{ position: 'absolute', top: 12, right: 16, zIndex: 1, maxWidth: 560 }}>{apiError}</Alert>}
       <Box sx={{ width: 300, pr: 2 }}>
         <Typography variant="h6" gutterBottom>
           テーブル一覧

@@ -3,7 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
+import Alert from '@mui/material/Alert';
 import isPlugin, { apiNonce, apiEndpoint } from '../isPlugin';
+import { readApiResponse } from '../apiResponse';
 
 const TableEditor = () => {
   const { table, id } = useParams();
@@ -11,6 +13,8 @@ const TableEditor = () => {
   const [data, setData] = useState({});
   const [columns, setColumns] = useState([]);
   const [userNames, setUserNames] = useState({});
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const isReadonly = (col) => {
     const name = col.Field.toLowerCase();
@@ -32,13 +36,15 @@ const TableEditor = () => {
   useEffect(() => {
     if (!table) return;
     if (isPlugin) {
-      fetch(apiEndpoint(`table/info?name=${table}`), { headers: { 'X-WP-Nonce': apiNonce }, credentials: 'include' })
-        .then(r => r.json())
-        .then(cols => setColumns(Array.isArray(cols) ? cols : []));
+      fetch(apiEndpoint(`table/info?name=${encodeURIComponent(table)}`), { headers: { 'X-WP-Nonce': apiNonce }, credentials: 'include' })
+        .then(readApiResponse)
+        .then(cols => setColumns(Array.isArray(cols) ? cols : []))
+        .catch(err => setError(err.message || 'テーブル情報を取得できませんでした。'));
       if (id) {
-        fetch(apiEndpoint(`table/row?name=${table}&id=${id}`), { headers: { 'X-WP-Nonce': apiNonce }, credentials: 'include' })
-          .then(r => r.json())
-          .then(row => setData(row));
+        fetch(apiEndpoint(`table/row?name=${encodeURIComponent(table)}&id=${encodeURIComponent(id)}`), { headers: { 'X-WP-Nonce': apiNonce }, credentials: 'include' })
+          .then(readApiResponse)
+          .then(row => setData(row))
+          .catch(err => setError(err.message || 'データを取得できませんでした。'));
       }
     }
   }, [table, id]);
@@ -60,7 +66,7 @@ const TableEditor = () => {
     setData({ ...data, [field]: value });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const endpoint = apiEndpoint(id ? 'table/update' : 'table/addrow');
     const sanitized = { ...data };
     columns.forEach(col => {
@@ -69,24 +75,45 @@ const TableEditor = () => {
       }
     });
     const body = id ? { name: table, id, data: sanitized } : { name: table, data: sanitized };
-    fetch(endpoint, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': apiNonce },
-      body: JSON.stringify(body),
-    }).then(() => navigate(`/`));
+    setSaving(true);
+    setError('');
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': apiNonce },
+        body: JSON.stringify(body),
+      });
+      await readApiResponse(response);
+      navigate('/');
+    } catch (err) {
+      setError(err.message || '保存できませんでした。');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDelete = () => {
-    fetch(apiEndpoint('table/delete'), {
+  const handleDelete = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      const response = await fetch(apiEndpoint('table/delete'), {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': apiNonce },
       body: JSON.stringify({ name: table, id })
-    }).then(() => navigate(`/`));
+      });
+      await readApiResponse(response);
+      navigate('/');
+    } catch (err) {
+      setError(err.message || '削除できませんでした。');
+    } finally {
+      setSaving(false);
+    }
   };
   return (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
+      {error && <Alert severity="error" sx={{ width: '100%', mb: 2 }}>{error}</Alert>}
       {columns.filter(col => col.Field !== 'id' && !isHidden(col)).map((col) => (
         <React.Fragment key={col.Field}>
           <TextField
@@ -103,8 +130,8 @@ const TableEditor = () => {
           )}
         </React.Fragment>
       ))}
-      <Button variant="contained" onClick={handleSave} sx={{ mr: 2 }}>保存</Button>
-      {id && <Button color="error" variant="outlined" onClick={handleDelete}>削除</Button>}
+      <Button variant="contained" onClick={handleSave} disabled={saving} sx={{ mr: 2 }}>{saving ? '保存中...' : '保存'}</Button>
+      {id && <Button color="error" variant="outlined" onClick={handleDelete} disabled={saving}>削除</Button>}
     </Box>
   );
 };
